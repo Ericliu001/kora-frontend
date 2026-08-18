@@ -1,0 +1,97 @@
+/* ACCESSIBILITY: Global styles with improved contrast and readability */
+
+.App {
+  text-align: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ACCESSIBILITY: Improved header background for better readability */
+.App-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  /* Softer gradient instead of harsh dark background */
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start; /* Changed from center to flex-start */
+  font-size: calc(14px + 1vmin); /* Smaller, more readable font scaling */
+  color: white;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* ACCESSIBILITY: Focus indicators for keyboard navigation */
+*:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* ACCESSIBILITY: Ensure buttons and interactive elements are accessible */
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* ACCESSIBILITY: Remove default focus styles that conflict with our custom ones */
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ACCESSIBILITY: High contrast mode support */
+@media (prefers-contrast: high) {
+  .App-header {
+    background: #000000;
+    color: #ffffff;
+  }
+}
+
+/* ACCESSIBILITY: Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* TYPOGRAPHY: Better text rendering */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+  color: #1f2937; /* Better default text color */
+}
+
+/* ACCESSIBILITY: Ensure sufficient spacing for touch targets */
+button {
+  min-height: 44px; /* Minimum touch target size */
+  min-width: 44px;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+textarea {
+  min-height: 44px; /* Minimum touch target size */
+}
+
+/* RESPONSIVE: Better mobile experience */
+@media (max-width: 768px) {
+  .App-header {
+    padding: 16px;
+    font-size: 16px;
+  }
+}
