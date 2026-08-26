@@ -1,140 +1,542 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
+import { request } from './api';
+import {
+  Beat,
+  Check,
+  LEVEL_LABEL,
+  ModuleDetail,
+  ModuleSummary,
+  Practice,
+  Recap,
+  Reflection,
+  SUB_SKILL_LABEL,
+  SUB_SKILL_ORDER,
+  SubSkill,
+  Utterance,
+} from './types';
 
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
+type Screen = 'modules' | 'intro' | 'practice' | 'recap';
 
-type OpeningMode = 'CHARACTER_GREETS' | 'USER_STARTS';
-type MessageRole = 'USER' | 'CHARACTER';
-type Screen = 'scenarios' | 'opening' | 'conversation' | 'recap';
+// ---------------------------------------------------------------------------
+// Presentation
+// ---------------------------------------------------------------------------
 
-interface Character { name: string; role: string; personality: string; interests: string[]; }
-interface Scenario { id: string; title: string; description: string; setting: string; character: Character; }
-interface Message { role: MessageRole; text: string; }
-interface Session { id: string; scenario: Scenario; openingMode: OpeningMode; messages: Message[]; }
-interface Turn { characterReply: string; coachPrompt: string; skillTags: string[]; conversationHealth: string; turnNumber: number; audioBase64?: string; audioContentType?: string; }
-interface Recap { strengths: string[]; improvement: string; suggestedFollowUp: string; skillTags: string[]; }
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: options.body instanceof FormData ? options.headers : { 'Content-Type': 'application/json', ...options.headers },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Something went wrong. Please try again.');
-  return body as T;
+function ModuleCard({ module, onChoose }: { module: ModuleSummary; onChoose: () => void }) {
+  return (
+    <button className="module-card" onClick={onChoose}>
+      <span className="module-icon">◠</span>
+      <span className="card-kicker">MODULE 1</span>
+      <strong>{module.title}</strong>
+      <span className="module-blurb">{module.blurb}</span>
+      <em>
+        {module.subSkillCount} sub-skills · about {module.estimatedMinutes} min →
+      </em>
+    </button>
+  );
 }
 
+/**
+ * The lesson itself, not decoration: three named things a reflection should do,
+ * shown in the same order every time so the learner builds a checklist.
+ */
+function ReflectionScorecard({ checks }: { checks: Reflection['checks'] }) {
+  const bySkill: Record<SubSkill, Check> = {
+    FACTS: checks.facts,
+    FEELING: checks.feeling,
+    INVITATION: checks.invitation,
+  };
+
+  return (
+    <ul className="scorecard">
+      {SUB_SKILL_ORDER.map((skill, index) => {
+        const check = bySkill[skill];
+        return (
+          <li
+            key={skill}
+            className={check.captured ? 'check captured' : 'check missed'}
+            style={{ animationDelay: `${index * 140}ms` }}
+          >
+            <span className="check-mark" aria-hidden="true">
+              {check.captured ? '✓' : '○'}
+            </span>
+            <span className="check-body">
+              <strong>{SUB_SKILL_LABEL[skill]}</strong>
+              <span>
+                {check.captured
+                  ? check.evidence ?? 'You captured this.'
+                  : check.missed
+                    ? `Missing: ${check.missed}`
+                    : 'Not yet.'}
+              </span>
+            </span>
+            <span className="visually-hidden">
+              {check.captured ? 'captured' : 'not captured'}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** The speaker's turn: her clip when there is one, her words when there isn't. */
+function BeatStage({
+  beat,
+  watched,
+  onWatched,
+}: {
+  beat: Beat;
+  watched: boolean;
+  onWatched: () => void;
+}) {
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [videoFailed, setVideoFailed] = useState(false);
+
+  useEffect(() => {
+    setVideoFailed(false);
+  }, [beat.id]);
+
+  const replay = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    video.currentTime = 0;
+    void video.play().catch(() => undefined);
+  };
+
+  if (beat.videoUrl && !videoFailed) {
+    return (
+      <div className="stage">
+        <video
+          ref={videoRef}
+          className="beat-video"
+          src={beat.videoUrl}
+          poster={beat.posterUrl}
+          controls
+          playsInline
+          onEnded={onWatched}
+          onError={() => {
+            // No clip on disk yet, or a codec this browser won't take.
+            // Fall back to her words so the exercise still works.
+            setVideoFailed(true);
+            onWatched();
+          }}
+        >
+          {beat.captionsUrl && (
+            <track kind="captions" src={beat.captionsUrl} srcLang="en" label="English" default />
+          )}
+        </video>
+        <div className="stage-actions">
+          <button className="quiet-button" onClick={replay}>
+            ↺ Play again
+          </button>
+          {!watched && <span className="muted small">Listen all the way through first.</span>}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="stage">
+      <blockquote className="beat-text">
+        <span className="card-kicker">{beat.speaker.toUpperCase()} SAYS</span>
+        <p>{beat.transcript}</p>
+      </blockquote>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// App
+// ---------------------------------------------------------------------------
+
 function App() {
-  const [screen, setScreen] = useState<Screen>('scenarios');
-  const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [selectedScenario, setSelectedScenario] = useState<Scenario | null>(null);
-  const [openingMode, setOpeningMode] = useState<OpeningMode>('CHARACTER_GREETS');
-  const [session, setSession] = useState<Session | null>(null);
+  const [screen, setScreen] = useState<Screen>('modules');
+  const [modules, setModules] = useState<ModuleSummary[]>([]);
+  const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
+
+  const [practiceId, setPracticeId] = useState<string | null>(null);
+  const [beat, setBeat] = useState<Beat | null>(null);
+  const [utterances, setUtterances] = useState<Utterance[]>([]);
+  const [clipWatched, setClipWatched] = useState(false);
   const [draft, setDraft] = useState('');
-  const [coachPrompt, setCoachPrompt] = useState('');
-  const [skills, setSkills] = useState<string[]>([]);
+  const [reflection, setReflection] = useState<Reflection | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState('');
+
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Which beats have already had their line written into the transcript. A ref,
+  // not state, because a retry must not log her line a second time and this
+  // must survive Strict Mode's double effect without causing another render.
+  const loggedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    request<Scenario[]>('/scenarios').then(setScenarios).catch((reason: Error) => setError(reason.message)).finally(() => setIsLoading(false));
+    request<ModuleSummary[]>('/modules')
+      .then(setModules)
+      .catch((reason: Error) => setError(reason.message))
+      .finally(() => setIsLoading(false));
   }, []);
+
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
-  const chooseScenario = (scenario: Scenario) => { setSelectedScenario(scenario); setOpeningMode('CHARACTER_GREETS'); setError(''); setScreen('opening'); };
+  /**
+   * Move a finished turn into the transcript. Her line is on the stage while the
+   * beat is live, so it is logged here — once — rather than displayed twice.
+   */
+  const logTurn = useCallback((current: Beat, reply: string) => {
+    setUtterances((all) => {
+      const hers = loggedRef.current.has(current.id)
+        ? []
+        : [{ speaker: 'THEM' as const, name: current.speaker, text: current.transcript }];
+      loggedRef.current.add(current.id);
+      return [...all, ...hers, { speaker: 'YOU' as const, name: 'You', text: reply }];
+    });
+  }, []);
 
-  const startSession = async () => {
-    if (!selectedScenario) return;
-    setIsLoading(true); setError('');
+  const openModule = async (id: string) => {
+    setIsLoading(true);
+    setError('');
     try {
-      const created = await request<Session>('/sessions', { method: 'POST', body: JSON.stringify({ scenarioId: selectedScenario.id, openingMode }) });
-      const ready = openingMode === 'CHARACTER_GREETS' ? await request<Session>(`/sessions/${created.id}/opening`, { method: 'POST' }) : created;
-      setSession(ready);
-      setCoachPrompt(openingMode === 'CHARACTER_GREETS' ? 'Listen for one detail you can respond to, then ask a curious follow-up question.' : 'Start simply: greet them, share one small detail, then ask an easy question.');
-      setSkills(['curiosity']); setScreen('conversation');
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to start practice.'); } finally { setIsLoading(false); }
-  };
-
-  const playAudio = (turn: Turn) => {
-    if (!turn.audioBase64 || !turn.audioContentType) return;
-    void new Audio(`data:${turn.audioContentType};base64,${turn.audioBase64}`).play().catch(() => undefined);
-  };
-
-  const submitTurn = async () => {
-    if (!session || !draft.trim() || isLoading) return;
-    const userMessage: Message = { role: 'USER', text: draft.trim() };
-    const submittedDraft = draft.trim();
-    setDraft(''); setSession({ ...session, messages: [...session.messages, userMessage] }); setIsLoading(true); setError('');
-    try {
-      const turn = await request<Turn>(`/sessions/${session.id}/turns`, { method: 'POST', body: JSON.stringify({ text: submittedDraft }) });
-      setSession((current) => current ? { ...current, messages: [...current.messages, { role: 'CHARACTER', text: turn.characterReply }] } : current);
-      setCoachPrompt(turn.coachPrompt); setSkills(turn.skillTags); playAudio(turn);
+      setModuleDetail(await request<ModuleDetail>(`/modules/${id}`));
+      setScreen('intro');
     } catch (reason) {
-      setDraft(submittedDraft); setSession((current) => current ? { ...current, messages: current.messages.slice(0, -1) } : current);
-      setError(reason instanceof Error ? reason.message : 'Unable to send your reply.');
-    } finally { setIsLoading(false); }
+      setError(reason instanceof Error ? reason.message : 'Unable to open that module.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const startPractice = async () => {
+    if (!moduleDetail) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      const practice = await request<Practice>('/practices', {
+        method: 'POST',
+        body: JSON.stringify({ moduleId: moduleDetail.id }),
+      });
+      loggedRef.current = new Set();
+      setPracticeId(practice.id);
+      setUtterances([]);
+      setReflection(null);
+      setDraft('');
+      setClipWatched(!practice.beat.videoUrl);
+      setBeat(practice.beat);
+      setScreen('practice');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to start practising.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const submitReflection = async () => {
+    const text = draft.trim();
+    if (!practiceId || !beat || !text || isLoading) return;
+
+    setIsLoading(true);
+    setError('');
+    try {
+      const result = await request<Reflection>(`/practices/${practiceId}/reflections`, {
+        method: 'POST',
+        body: JSON.stringify({ text }),
+      });
+      logTurn(beat, text);
+      setDraft('');
+      setReflection(result);
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to send your reflection.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const continueAfterFeedback = async () => {
+    if (!reflection) return;
+
+    if (reflection.retry) {
+      // Same beat, another go. Her clip has already been watched.
+      setReflection(null);
+      return;
+    }
+    if (reflection.nextBeat) {
+      const next = reflection.nextBeat;
+      setReflection(null);
+      setClipWatched(!next.videoUrl);
+      setBeat(next);
+      return;
+    }
+    await finish();
+  };
+
+  const finish = async () => {
+    if (!practiceId) return;
+    setIsLoading(true);
+    setError('');
+    try {
+      setRecap(await request<Recap>(`/practices/${practiceId}/complete`, { method: 'POST' }));
+      setScreen('recap');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Unable to build your recap.');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const toggleRecording = async () => {
-    if (isRecording) { recorderRef.current?.stop(); return; }
-    if (!session || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) { setError('Voice recording is not available in this browser. You can still type your response.'); return; }
+    if (isRecording) {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (!practiceId || !navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setError('Voice recording is not available in this browser. You can still type your reply.');
+      return;
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const chunks: Blob[] = []; const recorder = new MediaRecorder(stream);
-      streamRef.current = stream; recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
-      recorder.onstop = async () => {
-        setIsRecording(false); stream.getTracks().forEach((track) => track.stop()); setIsLoading(true); setError('');
-        try {
-          const form = new FormData(); form.append('audio', new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }), 'practice-response.webm');
-          const result = await request<{ transcript: string }>(`/sessions/${session.id}/transcribe`, { method: 'POST', body: form }); setDraft(result.transcript);
-        } catch (reason) { setError(reason instanceof Error ? reason.message : 'We could not transcribe that recording.'); } finally { setIsLoading(false); }
+      const chunks: Blob[] = [];
+      const recorder = new MediaRecorder(stream);
+      streamRef.current = stream;
+      recorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size) chunks.push(event.data);
       };
-      recorder.start(); setIsRecording(true);
-    } catch { setError('Microphone access was not granted. You can still type your response.'); }
+      recorder.onstop = async () => {
+        setIsRecording(false);
+        stream.getTracks().forEach((track) => track.stop());
+        setIsLoading(true);
+        setError('');
+        try {
+          const form = new FormData();
+          form.append(
+            'audio',
+            new Blob(chunks, { type: recorder.mimeType || 'audio/webm' }),
+            'reflection.webm',
+          );
+          const result = await request<{ transcript: string }>(
+            `/practices/${practiceId}/transcribe`,
+            { method: 'POST', body: form },
+          );
+          setDraft(result.transcript);
+        } catch (reason) {
+          setError(
+            reason instanceof Error ? reason.message : 'We could not transcribe that recording.',
+          );
+        } finally {
+          setIsLoading(false);
+        }
+      };
+
+      recorder.start();
+      setIsRecording(true);
+    } catch {
+      setError('Microphone access was not granted. You can still type your reply.');
+    }
   };
 
-  const finishPractice = async () => {
-    if (!session) return;
-    setIsLoading(true); setError('');
-    try { setRecap(await request<Recap>(`/sessions/${session.id}/complete`, { method: 'POST' })); setScreen('recap'); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to generate your recap.'); } finally { setIsLoading(false); }
+  const restart = () => {
+    setScreen('modules');
+    setModuleDetail(null);
+    setPracticeId(null);
+    setBeat(null);
+    setUtterances([]);
+    setReflection(null);
+    setRecap(null);
+    setDraft('');
+    setError('');
+    loggedRef.current = new Set();
   };
 
-  const restart = () => { setSession(null); setSelectedScenario(null); setRecap(null); setCoachPrompt(''); setSkills([]); setDraft(''); setError(''); setScreen('scenarios'); };
+  const canRespond = clipWatched && !reflection && !isLoading;
 
-  return <main className="app-shell">
-    <header className="topbar"><button className="brand" onClick={restart} aria-label="Return to scenario selection">kora<span>•</span></button><p>Small talk, made easier.</p></header>
-    {error && <div className="error-banner" role="alert">{error}</div>}
+  return (
+    <main className="app-shell">
+      <header className="topbar">
+        <button className="brand" onClick={restart} aria-label="Back to the gym">
+          kora<span>•</span>
+        </button>
+        <p>One conversation skill at a time.</p>
+      </header>
 
-    {screen === 'scenarios' && <section className="landing">
-      <p className="eyebrow">PRACTICE WITHOUT THE PRESSURE</p><h1>Find your flow in conversation.</h1><p className="intro">Choose a situation, talk with a character, and get a gentle nudge when you need one.</p>
-      <div className="scenario-grid">{isLoading && <p className="muted">Getting your practice rooms ready…</p>}{scenarios.map((scenario) => <button className="scenario-card" key={scenario.id} onClick={() => chooseScenario(scenario)}>
-        <span className="scenario-icon">{scenario.id === 'networking' ? '⌁' : scenario.id === 'party' ? '✦' : '☀'}</span><span className="card-kicker">WITH {scenario.character.name.toUpperCase()}</span><strong>{scenario.title}</strong><span>{scenario.description}</span><em>Start practice →</em>
-      </button>)}</div>
-    </section>}
+      {error && (
+        <div className="error-banner" role="alert">
+          {error}
+        </div>
+      )}
 
-    {screen === 'opening' && selectedScenario && <section className="opening-panel">
-      <button className="back-button" onClick={() => setScreen('scenarios')}>← All scenarios</button>
-      <div className="character-intro"><div className="avatar">{selectedScenario.character.name.charAt(0)}</div><div><p className="eyebrow">{selectedScenario.title.toUpperCase()}</p><h1>Meet {selectedScenario.character.name}.</h1><p>{selectedScenario.character.name} is a {selectedScenario.character.personality.toLowerCase()} {selectedScenario.character.role.toLowerCase()} who enjoys {selectedScenario.character.interests.join(', ')}.</p></div></div>
-      <fieldset className="opening-choice"><legend>Who starts the conversation?</legend><button className={openingMode === 'CHARACTER_GREETS' ? 'choice selected' : 'choice'} onClick={() => setOpeningMode('CHARACTER_GREETS')}><strong>Let {selectedScenario.character.name} greet me</strong><span>Ease in by responding to a warm opening.</span></button><button className={openingMode === 'USER_STARTS' ? 'choice selected' : 'choice'} onClick={() => setOpeningMode('USER_STARTS')}><strong>I’ll start</strong><span>Practise opening with a simple hello and question.</span></button></fieldset>
-      <button className="primary-button" disabled={isLoading} onClick={startSession}>{isLoading ? 'Starting…' : 'Begin practice'}</button>
-    </section>}
+      {screen === 'modules' && (
+        <section className="landing">
+          <p className="eyebrow">THE CONVERSATION GYM</p>
+          <h1>Practise one skill until it's yours.</h1>
+          <p className="intro">
+            Short, repeatable exercises. Someone tells you something real, you reply out loud, and
+            you find out exactly what you caught and what you missed.
+          </p>
+          <div className="module-grid">
+            {isLoading && <p className="muted">Opening the gym…</p>}
+            {modules.map((module) => (
+              <ModuleCard key={module.id} module={module} onChoose={() => openModule(module.id)} />
+            ))}
+          </div>
+        </section>
+      )}
 
-    {screen === 'conversation' && session && <section className="conversation-layout">
-      <aside className="practice-side"><p className="eyebrow">PRACTISING</p><h2>{session.scenario.title}</h2><div className="mini-character"><span className="avatar small">{session.scenario.character.name.charAt(0)}</span><span><strong>{session.scenario.character.name}</strong><small>{session.scenario.character.role}</small></span></div><button className="quiet-button" onClick={finishPractice} disabled={isLoading || !session.messages.some((message) => message.role === 'USER')}>Finish &amp; see recap</button></aside>
-      <div className="talk-panel"><div className="messages" aria-live="polite">{session.messages.length === 0 && <div className="empty-message"><div className="avatar">{session.scenario.character.name.charAt(0)}</div><h2>Your turn to open.</h2><p>Try a simple greeting, then ask an easy question about the setting.</p></div>}{session.messages.map((message, index) => <article className={`message ${message.role.toLowerCase()}`} key={`${message.role}-${index}`}><span>{message.role === 'CHARACTER' ? session.scenario.character.name : 'You'}</span><p>{message.text}</p></article>)}{isLoading && <div className="typing">{isRecording ? 'Listening…' : 'Thinking…'}</div>}</div>
-        <div className="composer"><label htmlFor="practice-draft">What would you like to say?</label><textarea id="practice-draft" value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Speak or type your response…" rows={3} disabled={isLoading && !isRecording} /><div className="composer-actions"><button className={isRecording ? 'record-button recording' : 'record-button'} onClick={toggleRecording} disabled={isLoading && !isRecording}>{isRecording ? '■ Stop recording' : '● Speak'}</button><button className="primary-button send-button" onClick={submitTurn} disabled={isLoading || !draft.trim()}>Send →</button></div></div>
-        <aside className="coach-card"><p className="eyebrow">YOUR NEXT STEP</p><p>{coachPrompt}</p><div>{skills.map((skill) => <span className="tag" key={skill}>{skill.replace(/_/g, ' ')}</span>)}</div></aside>
-      </div>
-    </section>}
+      {screen === 'intro' && moduleDetail && (
+        <section className="intro-panel">
+          <button className="back-button" onClick={restart}>
+            ← All modules
+          </button>
+          <p className="eyebrow">{moduleDetail.skill.toUpperCase()}</p>
+          <h1>{moduleDetail.title}</h1>
+          <p className="intro">{moduleDetail.blurb}</p>
 
-    {screen === 'recap' && recap && <section className="recap-panel"><p className="eyebrow">PRACTICE COMPLETE</p><h1>You kept the conversation moving.</h1><div className="recap-grid"><article><h2>What worked</h2><ul>{recap.strengths.map((strength) => <li key={strength}>{strength}</li>)}</ul></article><article><h2>Try next time</h2><p>{recap.improvement}</p></article></div><blockquote>“{recap.suggestedFollowUp}”</blockquote><div className="tag-list">{recap.skillTags.map((skill) => <span className="tag" key={skill}>{skill.replace(/_/g, ' ')}</span>)}</div><button className="primary-button" onClick={restart}>Choose another scenario</button></section>}
-  </main>;
+          <ol className="teaches">
+            {moduleDetail.teaches.map((item, index) => (
+              <li key={item.skill}>
+                <span className="teach-number">{index + 1}</span>
+                <span>
+                  <strong>{item.label}</strong>
+                  <span>{item.description}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
+
+          <p className="muted small">
+            Repeating someone's exact words back isn't reflecting. The point is to show you
+            understood — not that you were recording.
+          </p>
+
+          <button className="primary-button" disabled={isLoading} onClick={startPractice}>
+            {isLoading ? 'Starting…' : 'Start practising'}
+          </button>
+        </section>
+      )}
+
+      {screen === 'practice' && beat && (
+        <section className="practice-layout">
+          <aside className="practice-side">
+            <p className="eyebrow">PRACTISING</p>
+            <h2>{moduleDetail?.title ?? 'Listen and reflect'}</h2>
+            <p className="muted small">Turn {beat.turnNumber}</p>
+            <button
+              className="quiet-button"
+              onClick={finish}
+              disabled={isLoading || utterances.every((line) => line.speaker === 'THEM')}
+            >
+              Finish &amp; see recap
+            </button>
+          </aside>
+
+          <div className="practice-panel">
+            <BeatStage beat={beat} watched={clipWatched} onWatched={() => setClipWatched(true)} />
+
+            {utterances.length > 0 && (
+              <div className="transcript" aria-live="polite">
+                {utterances.map((line, index) => (
+                  <article
+                    className={`utterance ${line.speaker.toLowerCase()}`}
+                    key={`${line.speaker}-${index}`}
+                  >
+                    <span>{line.name}</span>
+                    <p>{line.text}</p>
+                  </article>
+                ))}
+              </div>
+            )}
+
+            {reflection ? (
+              <div className="feedback-panel">
+                <p className="eyebrow">{LEVEL_LABEL[reflection.level].toUpperCase()}</p>
+                <ReflectionScorecard checks={reflection.checks} />
+                <p className="feedback-line">{reflection.feedback}</p>
+
+                <div className="exemplar">
+                  <p className="card-kicker">
+                    {reflection.level === 'BEST' ? 'ANOTHER STRONG REPLY' : 'A STRONGER REPLY'}
+                  </p>
+                  <blockquote>“{reflection.exemplar.text}”</blockquote>
+                </div>
+
+                <button className="primary-button" onClick={continueAfterFeedback} disabled={isLoading}>
+                  {reflection.retry
+                    ? 'Try that again'
+                    : reflection.complete
+                      ? 'See your recap →'
+                      : 'Continue →'}
+                </button>
+              </div>
+            ) : (
+              <div className="composer">
+                <label htmlFor="reflection-draft">
+                  What would you say back to {beat.speaker}?
+                </label>
+                <textarea
+                  id="reflection-draft"
+                  value={draft}
+                  onChange={(event) => setDraft(event.target.value)}
+                  placeholder={
+                    clipWatched ? 'Speak or type your reply…' : 'Listen to the whole clip first…'
+                  }
+                  rows={3}
+                  disabled={!canRespond && !isRecording}
+                />
+                <div className="composer-actions">
+                  <button
+                    className={isRecording ? 'record-button recording' : 'record-button'}
+                    onClick={toggleRecording}
+                    disabled={!clipWatched || (isLoading && !isRecording) || !!reflection}
+                  >
+                    {isRecording ? '■ Stop recording' : '● Speak'}
+                  </button>
+                  <button
+                    className="primary-button send-button"
+                    onClick={submitReflection}
+                    disabled={!canRespond || !draft.trim()}
+                  >
+                    Reflect back →
+                  </button>
+                </div>
+                <span className="visually-hidden" role="status">
+                  {isRecording ? 'Recording your reply' : isLoading ? 'Working' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {screen === 'recap' && recap && (
+        <section className="recap-panel">
+          <p className="eyebrow">PRACTICE COMPLETE</p>
+          <h1>You listened for {recap.turnsCompleted === 1 ? 'a turn' : 'the whole conversation'}.</h1>
+          <p className="intro">{recap.summary}</p>
+
+          <div className="level-run">
+            {recap.levels.map((level, index) => (
+              <span className={`level-pip ${level.toLowerCase()}`} key={index}>
+                {LEVEL_LABEL[level]}
+              </span>
+            ))}
+          </div>
+
+          <div className="exemplar">
+            <p className="card-kicker">ONE TO KEEP</p>
+            <blockquote>“{recap.suggestedLine}”</blockquote>
+          </div>
+
+          <button className="primary-button" onClick={restart}>
+            Back to the gym
+          </button>
+        </section>
+      )}
+    </main>
+  );
 }
 
 export default App;

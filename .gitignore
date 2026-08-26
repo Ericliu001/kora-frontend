@@ -21,3 +21,9 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Placeholder practice clips — regenerate with scripts/make-placeholder-clips.sh.
+# Real footage replaces these at the same paths and SHOULD be committed; delete
+# the two ignore lines below when the first real recording lands.
+/public/modules/**/*.mp4
+/public/modules/**/*.jpg
