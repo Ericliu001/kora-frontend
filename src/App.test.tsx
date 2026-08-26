@@ -26,7 +26,8 @@ const MODULE_DETAIL = {
 const FILMED_BEAT = {
   id: 'new-job-1',
   speaker: 'Nadia',
-  transcript: 'I started a new job last week.',
+  transcript:
+    "I started a new job last week. Everyone's been really friendly, but there's so much to learn.",
   turnNumber: 1,
   videoUrl: '/modules/listen-and-reflect/new-job-1.mp4',
   captionsUrl: '/modules/listen-and-reflect/new-job-1.vtt',
@@ -112,17 +113,35 @@ test('the module intro names all three sub-skills before practice starts', async
   expect(screen.getByText('Invite them to continue')).toBeInTheDocument();
 });
 
-test('the learner cannot reply until the clip has finished', async () => {
+test('the learner can reply before the clip has finished', async () => {
   mockBackend();
   render(<App />);
   await reachThePracticeRoom();
 
-  expect(screen.getByRole('button', { name: /speak/i })).toBeDisabled();
-  expect(screen.getByRole('button', { name: /reflect back/i })).toBeDisabled();
+  // Nothing is blocked while she is still talking — only signposted.
+  expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
+  expect(screen.getByText(/nadia is still talking/i)).toBeInTheDocument();
 
   fireOnVideo('ended');
 
-  await waitFor(() => expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled());
+  await waitFor(() =>
+    expect(screen.queryByText(/nadia is still talking/i)).not.toBeInTheDocument(),
+  );
+});
+
+test('taking your turn stops her talking', async () => {
+  mockBackend();
+  render(<App />);
+  await reachThePracticeRoom();
+
+  const video = document.querySelector('video')!;
+  Object.defineProperty(video, 'paused', { value: false, configurable: true });
+  const pause = jest.spyOn(video, 'pause').mockImplementation(() => undefined);
+
+  await reflectWith('That sounds like a lot.');
+
+  // Otherwise she keeps talking over the feedback the learner is trying to read.
+  expect(pause).toHaveBeenCalled();
 });
 
 test('her filmed words stay out of the transcript until the learner has replied', async () => {
@@ -163,7 +182,10 @@ test('submitting a reflection shows all three checks, the feedback and a stronge
 
   await reflectWith('That sounds like a lot to take in.');
 
-  const scorecard = await screen.findByRole('list');
+  // Wait for the real feedback — the pending card renders a scorecard too.
+  await screen.findByText(REFLECTION.feedback);
+
+  const scorecard = screen.getByRole('list');
   const items = within(scorecard).getAllByRole('listitem');
   expect(items).toHaveLength(3);
 
@@ -175,7 +197,6 @@ test('submitting a reflection shows all three checks, the feedback and a stronge
   expect(items[2]).toHaveTextContent('an invitation to keep going');
   expect(items[2]).toHaveClass('missed');
 
-  expect(screen.getByText(REFLECTION.feedback)).toBeInTheDocument();
   expect(screen.getByText(`“${REFLECTION.exemplar.text}”`)).toBeInTheDocument();
   expect(screen.getByText('That sounds like a lot to take in.')).toBeInTheDocument();
 });
@@ -195,7 +216,53 @@ test('continuing moves to the written beat, which needs no clip', async () => {
   expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
 });
 
-test('a failed reflection surfaces the server message and keeps the draft', async () => {
+test('a written beat shows her line once, not on the stage and in the transcript', async () => {
+  mockBackend({
+    '/practices/p1/reflections': { ...REFLECTION, nextBeat: undefined, complete: false, retry: true },
+  });
+  render(<App />);
+  await reachThePracticeRoom();
+  fireOnVideo('error');
+
+  // Her words are in the conversation exactly once before the reply...
+  await waitFor(() => expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1));
+
+  await reflectWith('That sounds like a lot.');
+  await screen.findByText(REFLECTION.feedback);
+
+  // ...and still exactly once while the feedback is on screen.
+  expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1);
+});
+
+test('the reply lands immediately and a pending card holds the place', async () => {
+  mockBackend();
+  render(<App />);
+  await reachThePracticeRoom();
+  fireOnVideo('ended');
+
+  // Hold the assessment open so the waiting state is observable.
+  let release: () => void = () => undefined;
+  jest.spyOn(global, 'fetch').mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        release = () => resolve({ ok: true, json: () => Promise.resolve(REFLECTION) } as Response);
+      }),
+  );
+
+  await reflectWith('That sounds like a lot to take in.');
+
+  // The reply is already in the conversation, and the composer has stood down.
+  expect(await screen.findByText('That sounds like a lot to take in.')).toBeInTheDocument();
+  expect(screen.getByText(/listening back over what you said/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /reflect back/i })).not.toBeInTheDocument();
+
+  release();
+
+  expect(await screen.findByText(REFLECTION.feedback)).toBeInTheDocument();
+  expect(screen.queryByText(/listening back over what you said/i)).not.toBeInTheDocument();
+});
+
+test('a failed reflection rolls the conversation back, draft included', async () => {
   mockBackend();
   render(<App />);
   await reachThePracticeRoom();
@@ -211,6 +278,10 @@ test('a failed reflection surfaces the server message and keeps the draft', asyn
 
   expect(await screen.findByRole('alert')).toHaveTextContent('Assessment failed (502).');
   expect(await composer()).toHaveValue('Sounds like a lot.');
+
+  // The optimistic turn is gone again — hers and the learner's both.
+  expect(screen.queryByText('Sounds like a lot.', { selector: 'p' })).not.toBeInTheDocument();
+  expect(screen.queryByText(FILMED_BEAT.transcript)).not.toBeInTheDocument();
 });
 
 test('a missing clip falls back to her words rather than blocking the exercise', async () => {

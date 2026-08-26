@@ -80,23 +80,56 @@ function ReflectionScorecard({ checks }: { checks: Reflection['checks'] }) {
   );
 }
 
-/** The speaker's turn: her clip when there is one, her words when there isn't. */
+/**
+ * What sits where the feedback will land while the server is judging.
+ *
+ * It mirrors the scorecard's shape so the three rows stay put when the real
+ * checks arrive — and naming the sub-skills again while the learner waits is
+ * one more repetition of the thing the module is teaching.
+ */
+function ReflectionPending() {
+  return (
+    <div className="feedback-panel" aria-busy="true">
+      <p className="eyebrow">CHECKING YOUR REFLECTION</p>
+      <ul className="scorecard">
+        {SUB_SKILL_ORDER.map((skill, index) => (
+          <li key={skill} className="check pending" style={{ animationDelay: `${index * 140}ms` }}>
+            <span className="check-mark" aria-hidden="true">
+              ·
+            </span>
+            <span className="check-body">
+              <strong>{SUB_SKILL_LABEL[skill]}</strong>
+              <span className="skeleton-line" aria-hidden="true" />
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="pending-note" role="status">
+        Listening back over what you said…
+      </p>
+    </div>
+  );
+}
+
+/**
+ * The speaker's clip. Rendered only when there is video to play — a written
+ * beat (or a clip that won't load) puts her words straight into the transcript
+ * instead, so her line is never on screen in two places at once.
+ *
+ * The element is owned by the caller: replying mid-sentence has to be able to
+ * stop her talking.
+ */
 function BeatStage({
   beat,
-  watched,
-  onWatched,
+  videoRef,
+  onEnded,
+  onUnavailable,
 }: {
   beat: Beat;
-  watched: boolean;
-  onWatched: () => void;
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+  onEnded: () => void;
+  onUnavailable: () => void;
 }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [videoFailed, setVideoFailed] = useState(false);
-
-  useEffect(() => {
-    setVideoFailed(false);
-  }, [beat.id]);
-
   const replay = () => {
     const video = videoRef.current;
     if (!video) return;
@@ -104,44 +137,28 @@ function BeatStage({
     void video.play().catch(() => undefined);
   };
 
-  if (beat.videoUrl && !videoFailed) {
-    return (
-      <div className="stage">
-        <video
-          ref={videoRef}
-          className="beat-video"
-          src={beat.videoUrl}
-          poster={beat.posterUrl}
-          controls
-          playsInline
-          onEnded={onWatched}
-          onError={() => {
-            // No clip on disk yet, or a codec this browser won't take.
-            // Fall back to her words so the exercise still works.
-            setVideoFailed(true);
-            onWatched();
-          }}
-        >
-          {beat.captionsUrl && (
-            <track kind="captions" src={beat.captionsUrl} srcLang="en" label="English" default />
-          )}
-        </video>
-        <div className="stage-actions">
-          <button className="quiet-button" onClick={replay}>
-            ↺ Play again
-          </button>
-          {!watched && <span className="muted small">Listen all the way through first.</span>}
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="stage">
-      <blockquote className="beat-text">
-        <span className="card-kicker">{beat.speaker.toUpperCase()} SAYS</span>
-        <p>{beat.transcript}</p>
-      </blockquote>
+      <video
+        ref={videoRef}
+        className="beat-video"
+        src={beat.videoUrl}
+        poster={beat.posterUrl}
+        controls
+        playsInline
+        onEnded={onEnded}
+        // No clip on disk yet, or a codec this browser won't take.
+        onError={onUnavailable}
+      >
+        {beat.captionsUrl && (
+          <track kind="captions" src={beat.captionsUrl} srcLang="en" label="English" default />
+        )}
+      </video>
+      <div className="stage-actions">
+        <button className="quiet-button" onClick={replay}>
+          ↺ Play again
+        </button>
+      </div>
     </div>
   );
 }
@@ -159,14 +176,18 @@ function App() {
   const [beat, setBeat] = useState<Beat | null>(null);
   const [utterances, setUtterances] = useState<Utterance[]>([]);
   const [clipWatched, setClipWatched] = useState(false);
+  const [videoFailed, setVideoFailed] = useState(false);
   const [draft, setDraft] = useState('');
   const [reflection, setReflection] = useState<Reflection | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
 
   const [isLoading, setIsLoading] = useState(true);
+  // The two waits the learner actually notices, each with something to say.
+  const [busy, setBusy] = useState<'assessing' | 'transcribing' | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState('');
 
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   // Which beats have already had their line written into the transcript. A ref,
@@ -183,11 +204,21 @@ function App() {
 
   useEffect(() => () => streamRef.current?.getTracks().forEach((track) => track.stop()), []);
 
+  /** Put her line in the transcript. Once per beat, whenever it first belongs there. */
+  const revealHerLine = useCallback((current: Beat) => {
+    if (loggedRef.current.has(current.id)) return;
+    loggedRef.current.add(current.id);
+    setUtterances((all) => [
+      ...all,
+      { speaker: 'THEM', name: current.speaker, text: current.transcript },
+    ]);
+  }, []);
+
   /**
-   * Move a finished turn into the transcript. Her line is on the stage while the
-   * beat is live, so it is logged here — once — rather than displayed twice.
+   * Move a finished turn into the transcript. On a filmed beat her line has not
+   * been written down yet, so it goes in just ahead of the reply.
    */
-  const logTurn = useCallback((current: Beat, reply: string) => {
+  const logReply = useCallback((current: Beat, reply: string) => {
     setUtterances((all) => {
       const hers = loggedRef.current.has(current.id)
         ? []
@@ -196,6 +227,15 @@ function App() {
       return [...all, ...hers, { speaker: 'YOU' as const, name: 'You', text: reply }];
     });
   }, []);
+
+  // No clip to watch — her words go straight into the conversation.
+  const hasClip = !!beat?.videoUrl && !videoFailed;
+  useEffect(() => {
+    if (beat && !hasClip) {
+      setClipWatched(true);
+      revealHerLine(beat);
+    }
+  }, [beat, hasClip, revealHerLine]);
 
   const openModule = async (id: string) => {
     setIsLoading(true);
@@ -224,6 +264,7 @@ function App() {
       setUtterances([]);
       setReflection(null);
       setDraft('');
+      setVideoFailed(false);
       setClipWatched(!practice.beat.videoUrl);
       setBeat(practice.beat);
       setScreen('practice');
@@ -238,19 +279,33 @@ function App() {
     const text = draft.trim();
     if (!practiceId || !beat || !text || isLoading) return;
 
+    stopHerTalking();
+
+    // Show the reply landing straight away and wait underneath it, rather than
+    // leaving the learner staring at their own unsent draft.
+    const previousUtterances = utterances;
+    const herLineWasLogged = loggedRef.current.has(beat.id);
+    logReply(beat, text);
+    setDraft('');
     setIsLoading(true);
+    setBusy('assessing');
     setError('');
+
     try {
-      const result = await request<Reflection>(`/practices/${practiceId}/reflections`, {
-        method: 'POST',
-        body: JSON.stringify({ text }),
-      });
-      logTurn(beat, text);
-      setDraft('');
-      setReflection(result);
+      setReflection(
+        await request<Reflection>(`/practices/${practiceId}/reflections`, {
+          method: 'POST',
+          body: JSON.stringify({ text }),
+        }),
+      );
     } catch (reason) {
+      // Put the conversation back exactly as it was, draft included.
+      setUtterances(previousUtterances);
+      if (!herLineWasLogged) loggedRef.current.delete(beat.id);
+      setDraft(text);
       setError(reason instanceof Error ? reason.message : 'Unable to send your reflection.');
     } finally {
+      setBusy(null);
       setIsLoading(false);
     }
   };
@@ -266,6 +321,7 @@ function App() {
     if (reflection.nextBeat) {
       const next = reflection.nextBeat;
       setReflection(null);
+      setVideoFailed(false);
       setClipWatched(!next.videoUrl);
       setBeat(next);
       return;
@@ -296,6 +352,7 @@ function App() {
       setError('Voice recording is not available in this browser. You can still type your reply.');
       return;
     }
+    stopHerTalking();
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const chunks: Blob[] = [];
@@ -310,6 +367,7 @@ function App() {
         setIsRecording(false);
         stream.getTracks().forEach((track) => track.stop());
         setIsLoading(true);
+        setBusy('transcribing');
         setError('');
         try {
           const form = new FormData();
@@ -328,6 +386,7 @@ function App() {
             reason instanceof Error ? reason.message : 'We could not transcribe that recording.',
           );
         } finally {
+          setBusy(null);
           setIsLoading(false);
         }
       };
@@ -349,10 +408,21 @@ function App() {
     setRecap(null);
     setDraft('');
     setError('');
+    setBusy(null);
     loggedRef.current = new Set();
   };
 
-  const canRespond = clipWatched && !reflection && !isLoading;
+  // Replying before she has finished is allowed. Cutting someone off is a real
+  // thing people do, and blocking the control taught nothing about it — it just
+  // made the page feel broken when a browser never fired `ended`.
+  const canRespond = !reflection && !isLoading;
+  const sheIsStillTalking = hasClip && !clipWatched;
+
+  /** She stops when the learner takes their turn — talking over each other helps nobody. */
+  const stopHerTalking = () => {
+    const video = videoRef.current;
+    if (video && !video.paused) video.pause();
+  };
 
   return (
     <main className="app-shell">
@@ -434,7 +504,14 @@ function App() {
           </aside>
 
           <div className="practice-panel">
-            <BeatStage beat={beat} watched={clipWatched} onWatched={() => setClipWatched(true)} />
+            {hasClip && (
+              <BeatStage
+                beat={beat}
+                videoRef={videoRef}
+                onEnded={() => setClipWatched(true)}
+                onUnavailable={() => setVideoFailed(true)}
+              />
+            )}
 
             {utterances.length > 0 && (
               <div className="transcript" aria-live="polite">
@@ -450,7 +527,9 @@ function App() {
               </div>
             )}
 
-            {reflection ? (
+            {busy === 'assessing' ? (
+              <ReflectionPending />
+            ) : reflection ? (
               <div className="feedback-panel">
                 <p className="eyebrow">{LEVEL_LABEL[reflection.level].toUpperCase()}</p>
                 <ReflectionScorecard checks={reflection.checks} />
@@ -480,9 +559,7 @@ function App() {
                   id="reflection-draft"
                   value={draft}
                   onChange={(event) => setDraft(event.target.value)}
-                  placeholder={
-                    clipWatched ? 'Speak or type your reply…' : 'Listen to the whole clip first…'
-                  }
+                  placeholder="Speak or type your reply…"
                   rows={3}
                   disabled={!canRespond && !isRecording}
                 />
@@ -490,7 +567,7 @@ function App() {
                   <button
                     className={isRecording ? 'record-button recording' : 'record-button'}
                     onClick={toggleRecording}
-                    disabled={!clipWatched || (isLoading && !isRecording) || !!reflection}
+                    disabled={(isLoading && !isRecording) || !!reflection}
                   >
                     {isRecording ? '■ Stop recording' : '● Speak'}
                   </button>
@@ -502,8 +579,19 @@ function App() {
                     Reflect back →
                   </button>
                 </div>
+                {busy === 'transcribing' ? (
+                  <p className="pending-note" role="status">
+                    Writing down what you said…
+                  </p>
+                ) : (
+                  sheIsStillTalking && (
+                    <p className="composer-hint">
+                      {beat.speaker} is still talking — reply whenever you're ready.
+                    </p>
+                  )
+                )}
                 <span className="visually-hidden" role="status">
-                  {isRecording ? 'Recording your reply' : isLoading ? 'Working' : ''}
+                  {isRecording ? 'Recording your reply' : ''}
                 </span>
               </div>
             )}
