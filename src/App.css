@@ -258,6 +258,13 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .teaches li > span:last-child { display: flex; flex-direction: column; gap: 4px; }
 .teaches li span span { color: var(--text-light); font-size: 14px; line-height: 1.45; }
 
+.teach-purpose {
+  margin-top: 2px;
+  color: var(--primary-color);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .teach-number {
   flex: none;
   width: 28px;
@@ -434,6 +441,80 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .composer:focus-within { border-color: var(--primary-color); }
 
 .composer label { display: block; margin-bottom: 9px; font-size: 13px; font-weight: 800; }
+
+.composer-attempt { margin: -4px 0 9px; color: var(--text-light); font-size: 13px; }
+
+/* The checklist the learner composes against. Same three rows, same order and
+ * the same marks as .scorecard — one object, seen before and after. */
+.composer-guide {
+  margin: -4px 0 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.composer-guide > summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.composer-guide > summary::-webkit-details-marker { display: none; }
+.composer-guide > summary::after {
+  margin-left: auto;
+  color: var(--text-light);
+  font-size: 12px;
+  content: '▾ show';
+}
+.composer-guide[open] > summary::after { content: '▴ hide'; }
+
+.guide-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.guide-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tint);
+  color: var(--text-light);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.guide-chip.captured { background: var(--success-bg); color: var(--success); }
+.guide-chip.open { background: var(--warn-bg); color: var(--warn); }
+
+/* Open the guide and the chips are redundant with the rows underneath. */
+.composer-guide[open] .guide-chips { display: none; }
+
+.composer-guide ul { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+
+.guide-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--bg-light);
+}
+
+.guide-row.captured { background: var(--success-bg); }
+.guide-row.open { background: var(--warn-bg); }
+
+.guide-mark { font-size: 15px; font-weight: 800; line-height: 1.4; color: var(--text-light); }
+.guide-row.captured .guide-mark { color: var(--success); }
+.guide-row.open .guide-mark { color: var(--warn); }
+
+.guide-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.guide-body strong { font-size: 14px; }
+.guide-body span { color: var(--text-light); font-size: 14px; line-height: 1.45; }
+.guide-body em { color: var(--primary-color); font-size: 13px; line-height: 1.45; }
+
+/* On a tinted row the indigo drops to ~4.2:1 in dark mode, under AA for 13px.
+ * The italic already marks the purpose as a different voice, so the colour is
+ * free to give way to the one that stays readable on every wash. */
+.guide-row.captured .guide-body em,
+.guide-row.open .guide-body em { color: var(--text-dark); }
 
 .composer textarea {
   width: 100%;

@@ -7,17 +7,37 @@ import SiteHeader from './components/SiteHeader';
 import {
   Beat,
   Check,
+  Checks,
+  joinPhrases,
   LEVEL_LABEL,
   ModuleDetail,
   ModuleSummary,
   Practice,
   Recap,
   Reflection,
+  RETRY_PROMPT,
   SUB_SKILL_LABEL,
   SUB_SKILL_ORDER,
   SubSkill,
+  SubSkillInfo,
   Utterance,
 } from './types';
+
+/**
+ * Mirrors MAX_ATTEMPTS_PER_BEAT in backend/.../plugins/GymRouting.kt.
+ *
+ * The server decides when a learner has had enough tries; this copy exists
+ * only so the composer can say how many are left. If the two ever disagree,
+ * the server is right and this line is the bug.
+ */
+const MAX_ATTEMPTS_PER_BEAT = 3;
+
+/** The three checks, addressable by sub-skill rather than by field name. */
+const checkBySkill = (checks: Checks): Record<SubSkill, Check> => ({
+  FACTS: checks.facts,
+  FEELING: checks.feeling,
+  INVITATION: checks.invitation,
+});
 
 // ---------------------------------------------------------------------------
 // Presentation
@@ -42,11 +62,7 @@ function ModuleCard({ module, onChoose }: { module: ModuleSummary; onChoose: () 
  * shown in the same order every time so the learner builds a checklist.
  */
 function ReflectionScorecard({ checks }: { checks: Reflection['checks'] }) {
-  const bySkill: Record<SubSkill, Check> = {
-    FACTS: checks.facts,
-    FEELING: checks.feeling,
-    INVITATION: checks.invitation,
-  };
+  const bySkill = checkBySkill(checks);
 
   return (
     <ul className="scorecard" aria-label="Your reflection, check by check">
@@ -78,6 +94,77 @@ function ReflectionScorecard({ checks }: { checks: Reflection['checks'] }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * The three sub-skills, in front of the learner while they are composing.
+ *
+ * These are the same three rows in the same order as [ReflectionScorecard],
+ * deliberately: the list you aim at and the list you are marked against should
+ * be one object seen at two moments, not two lists that happen to rhyme.
+ *
+ * [checks] arrives only on a second attempt, and only ever as ticks. What was
+ * missed stays generic — `evidence` and `missed` carry the rubric's own words
+ * and are never rendered here, so finding them is still the learner's job the
+ * second time around.
+ */
+function ComposerGuide({
+  teaches,
+  checks,
+  startOpen,
+}: {
+  teaches: SubSkillInfo[];
+  checks?: Checks | null;
+  startOpen: boolean;
+}) {
+  if (teaches.length === 0) return null;
+
+  const bySkill = checks ? checkBySkill(checks) : null;
+  const ordered = SUB_SKILL_ORDER.map((skill) =>
+    teaches.find((item) => item.skill === skill),
+  ).filter((item): item is SubSkillInfo => !!item);
+
+  const mark = (skill: SubSkill) => {
+    const check = bySkill?.[skill];
+    if (!check) return { symbol: '·', state: 'neutral', note: '' };
+    return check.captured
+      ? { symbol: '✓', state: 'captured', note: 'already captured' }
+      : { symbol: '○', state: 'open', note: 'still open' };
+  };
+
+  return (
+    <details className="composer-guide" open={startOpen}>
+      <summary>
+        <span className="card-kicker">A GOOD REFLECTION DOES THREE THINGS</span>
+        <span className="guide-chips" aria-hidden="true">
+          {ordered.map((item) => (
+            <span className={`guide-chip ${mark(item.skill).state}`} key={item.skill}>
+              {mark(item.skill).symbol} {SUB_SKILL_LABEL[item.skill]}
+            </span>
+          ))}
+        </span>
+      </summary>
+
+      <ul aria-label="What to aim for">
+        {ordered.map((item) => {
+          const { symbol, state, note } = mark(item.skill);
+          return (
+            <li className={`guide-row ${state}`} key={item.skill}>
+              <span className="guide-mark" aria-hidden="true">
+                {symbol}
+              </span>
+              <span className="guide-body">
+                <strong>{item.label}</strong>
+                <span>{item.description}</span>
+                <em>{item.purpose}</em>
+              </span>
+              {note && <span className="visually-hidden">{note}</span>}
+            </li>
+          );
+        })}
+      </ul>
+    </details>
   );
 }
 
@@ -213,6 +300,7 @@ function ModuleIntro({
             <span>
               <strong>{item.label}</strong>
               <span>{item.description}</span>
+              <em className="teach-purpose">{item.purpose}</em>
             </span>
           </li>
         ))}
@@ -244,6 +332,12 @@ function App() {
   const [draft, setDraft] = useState('');
   const [reflection, setReflection] = useState<Reflection | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
+
+  // What survives a retry. Dropping the checks with the feedback card sent the
+  // learner back to an identical blank prompt with nothing to aim at, which is
+  // the one moment in the loop where they most need something to aim at.
+  const [carriedChecks, setCarriedChecks] = useState<Checks | null>(null);
+  const [attemptNumber, setAttemptNumber] = useState(1);
 
   const [isLoading, setIsLoading] = useState(true);
   // The two waits the learner actually notices, each with something to say.
@@ -328,6 +422,8 @@ function App() {
       setPracticeId(practice.id);
       setUtterances([]);
       setReflection(null);
+      setCarriedChecks(null);
+      setAttemptNumber(1);
       setDraft('');
       setVideoFailed(false);
       setClipWatched(!practice.beat.videoUrl);
@@ -380,13 +476,19 @@ function App() {
     if (!reflection) return;
 
     if (reflection.retry) {
-      // Same beat, another go. Her clip has already been watched.
+      // Same beat, another go. Her clip has already been watched — and the
+      // checks come with them, so the second attempt starts from what landed
+      // rather than from nothing.
+      setCarriedChecks(reflection.checks);
+      setAttemptNumber(reflection.attemptsOnBeat + 1);
       setReflection(null);
       return;
     }
     if (reflection.nextBeat) {
       const next = reflection.nextBeat;
       setReflection(null);
+      setCarriedChecks(null);
+      setAttemptNumber(1);
       setVideoFailed(false);
       setClipWatched(!next.videoUrl);
       setBeat(next);
@@ -470,6 +572,8 @@ function App() {
     setBeat(null);
     setUtterances([]);
     setReflection(null);
+    setCarriedChecks(null);
+    setAttemptNumber(1);
     setRecap(null);
     setDraft('');
     setError('');
@@ -483,6 +587,17 @@ function App() {
   // made the page feel broken when a browser never fired `ended`.
   const canRespond = !reflection && !isLoading;
   const sheIsStillTalking = hasClip && !clipWatched;
+
+  // Which of the three are still open on a second attempt. Named by move, not
+  // by content: `RETRY_PROMPT` says "name how they feel", never the feeling.
+  const stillOpen = carriedChecks
+    ? SUB_SKILL_ORDER.filter((skill) => !checkBySkill(carriedChecks)[skill].captured)
+    : [];
+
+  const composerLabel =
+    stillOpen.length > 0
+      ? `Try again — this time, ${joinPhrases(stillOpen.map((skill) => RETRY_PROMPT[skill]))}.`
+      : `What would you say back to ${beat?.speaker ?? 'them'}?`;
 
   /** She stops when the learner takes their turn — talking over each other helps nobody. */
   const stopHerTalking = () => {
@@ -578,7 +693,18 @@ function App() {
           </div>
         ) : (
           <div className="composer">
-            <label htmlFor="reflection-draft">What would you say back to {beat.speaker}?</label>
+            <ComposerGuide
+              key={`${beat.id}-${attemptNumber}`}
+              teaches={moduleDetail?.teaches ?? []}
+              checks={carriedChecks}
+              startOpen={beat.turnNumber === 1 || attemptNumber > 1}
+            />
+            <label htmlFor="reflection-draft">{composerLabel}</label>
+            {attemptNumber > 1 && (
+              <p className="composer-attempt">
+                Attempt {attemptNumber} of {MAX_ATTEMPTS_PER_BEAT}
+              </p>
+            )}
             <textarea
               id="reflection-draft"
               value={draft}

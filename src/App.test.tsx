@@ -21,9 +21,24 @@ const MODULE_SUMMARY = {
 const MODULE_DETAIL = {
   ...MODULE_SUMMARY,
   teaches: [
-    { skill: 'FACTS', label: 'Reflect the facts', description: 'Say back what happened.' },
-    { skill: 'FEELING', label: 'Recognise the emotion', description: 'Name how they feel.' },
-    { skill: 'INVITATION', label: 'Invite them to continue', description: 'Leave an opening.' },
+    {
+      skill: 'FACTS',
+      label: 'Reflect the facts',
+      description: 'Say back what happened.',
+      purpose: 'Their words back at them proves you were recording.',
+    },
+    {
+      skill: 'FEELING',
+      label: 'Recognise the emotion',
+      description: 'Name how they feel.',
+      purpose: 'This is what makes someone feel heard.',
+    },
+    {
+      skill: 'INVITATION',
+      label: 'Invite them to continue',
+      description: 'Leave an opening.',
+      purpose: 'It hands the conversation back.',
+    },
   ],
   exerciseCount: 1,
 };
@@ -59,6 +74,21 @@ const REFLECTION = {
   complete: false,
 };
 
+/** A first attempt that lands the facts only, so the learner is sent back. */
+const RETRY_REFLECTION = {
+  ...REFLECTION,
+  level: 'DEVELOPING',
+  checks: {
+    facts: { captured: true, evidence: 'you reflected that she started a new job' },
+    feeling: { captured: false, missed: 'overwhelmed' },
+    invitation: { captured: false, missed: 'an invitation to keep going' },
+  },
+  exemplar: { tier: 'BETTER', text: 'It sounds like that has left you overwhelmed.' },
+  attemptsOnBeat: 1,
+  retry: true,
+  nextBeat: undefined,
+};
+
 function mockBackend(overrides: Record<string, unknown> = {}) {
   const routes: Record<string, unknown> = {
     '/modules': [MODULE_SUMMARY],
@@ -87,7 +117,9 @@ function fireOnVideo(event: 'ended' | 'error') {
   video.dispatchEvent(new Event(event));
 }
 
-const composer = () => screen.findByLabelText(/what would you say back to nadia/i);
+// By role, not by label: the label is the guidance now, and it changes between
+// a first attempt and a retry. The textarea is the only textbox on the page.
+const composer = () => screen.findByRole('textbox');
 
 async function reachThePracticeRoom() {
   userEvent.click(await screen.findByRole('button', { name: /listen and reflect/i }));
@@ -286,6 +318,77 @@ test('a failed reflection rolls the conversation back, draft included', async ()
   // The optimistic turn is gone again — hers and the learner's both.
   expect(screen.queryByText('Sounds like a lot.', { selector: 'p' })).not.toBeInTheDocument();
   expect(screen.queryByText(FILMED_BEAT.transcript)).not.toBeInTheDocument();
+});
+
+test('the composer names the three sub-skills, and why each one works', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  const guide = screen.getByRole('list', { name: /what to aim for/i });
+  const rows = within(guide).getAllByRole('listitem');
+  expect(rows).toHaveLength(3);
+
+  // The instruction and the reason for it, in scorecard order.
+  expect(rows[0]).toHaveTextContent('Reflect the facts');
+  expect(rows[0]).toHaveTextContent('Their words back at them proves you were recording.');
+  expect(rows[1]).toHaveTextContent('Recognise the emotion');
+  expect(rows[2]).toHaveTextContent('It hands the conversation back.');
+});
+
+test('a retry keeps what landed and asks for what is still open', async () => {
+  mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
+  renderApp();
+  await reachThePracticeRoom();
+  fireOnVideo('ended');
+
+  await reflectWith('You started a new job.');
+  userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
+
+  // The prompt now names the two moves that are missing, and only those.
+  expect(
+    await screen.findByText(/try again — this time, name how they feel and leave them an opening\./i),
+  ).toBeInTheDocument();
+  expect(screen.getByText(/attempt 2 of 3/i)).toBeInTheDocument();
+
+  const rows = within(screen.getByRole('list', { name: /what to aim for/i })).getAllByRole(
+    'listitem',
+  );
+  expect(rows[0]).toHaveClass('captured');
+  expect(rows[1]).toHaveClass('open');
+  expect(rows[2]).toHaveClass('open');
+});
+
+test('the retry guidance points at the missing move without giving the answer', async () => {
+  mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
+  renderApp();
+  await reachThePracticeRoom();
+  fireOnVideo('ended');
+
+  await reflectWith('You started a new job.');
+  userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
+  await screen.findByRole('list', { name: /what to aim for/i });
+
+  // The rubric's own words live in `missed` and `evidence`. They belong in the
+  // scorecard after an attempt, never in front of the next one — otherwise the
+  // second try is copying, not reflecting.
+  const composerPanel = document.querySelector('.composer')!;
+  expect(composerPanel).not.toHaveTextContent('overwhelmed');
+  expect(composerPanel).not.toHaveTextContent('an invitation to keep going');
+  expect(composerPanel).not.toHaveTextContent(RETRY_REFLECTION.checks.facts.evidence);
+});
+
+test('moving to the next beat clears the retry guidance', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+  fireOnVideo('ended');
+
+  await reflectWith('A lot to take in.');
+  userEvent.click(await screen.findByRole('button', { name: /continue/i }));
+
+  expect(await screen.findByText(/what would you say back to nadia\?/i)).toBeInTheDocument();
+  expect(screen.queryByText(/attempt 2 of 3/i)).not.toBeInTheDocument();
 });
 
 test('a missing clip falls back to her words rather than blocking the exercise', async () => {

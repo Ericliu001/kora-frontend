@@ -8,7 +8,10 @@ export type Level = 'DEVELOPING' | 'BETTER' | 'BEST';
 export interface SubSkillInfo {
   skill: SubSkill;
   label: string;
+  /** The instruction — what to do. */
   description: string;
+  /** Why it works. Shown next to the instruction, before the learner replies. */
+  purpose: string;
 }
 
 export interface ModuleSummary {
@@ -106,3 +109,22 @@ export const LEVEL_LABEL: Record<Level, string> = {
   BETTER: 'Good reflection',
   BEST: 'Strong reflection',
 };
+
+/**
+ * How each sub-skill is asked for on a second attempt.
+ *
+ * Deliberately generic: these name the move, never the answer. The rubric's
+ * words — what she said, what she feels — stay on the server, so finding them
+ * is still the learner's job the second time around.
+ */
+export const RETRY_PROMPT: Record<SubSkill, string> = {
+  FACTS: 'say back what happened',
+  FEELING: 'name how they feel',
+  INVITATION: 'leave them an opening',
+};
+
+/** "a", "a and b", "a, b and c" — for stitching prompts into one sentence. */
+export function joinPhrases(parts: string[]): string {
+  if (parts.length <= 1) return parts.join('');
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+}
