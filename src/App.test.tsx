@@ -30,7 +30,6 @@ const FILMED_BEAT = {
     "I started a new job last week. Everyone's been really friendly, but there's so much to learn.",
   turnNumber: 1,
   videoUrl: '/modules/listen-and-reflect/new-job-1.mp4',
-  captionsUrl: '/modules/listen-and-reflect/new-job-1.vtt',
 };
 
 const WRITTEN_BEAT = {

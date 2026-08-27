@@ -149,11 +149,7 @@ function BeatStage({
         onEnded={onEnded}
         // No clip on disk yet, or a codec this browser won't take.
         onError={onUnavailable}
-      >
-        {beat.captionsUrl && (
-          <track kind="captions" src={beat.captionsUrl} srcLang="en" label="English" default />
-        )}
-      </video>
+      />
       <div className="stage-actions">
         <button className="quiet-button" onClick={replay}>
           ↺ Play again

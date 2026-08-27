@@ -39,7 +39,6 @@ export interface Beat {
   videoUrl?: string;
   audioUrl?: string;
   posterUrl?: string;
-  captionsUrl?: string;
   durationSeconds?: number;
 }
 

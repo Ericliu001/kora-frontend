@@ -5,8 +5,7 @@
 ```
 frontend/public/modules/listen-and-reflect/
 ├── new-job-1.mp4    ← the video          (required)
-├── new-job-1.jpg    ← the still shown before it plays  (required)
-├── new-job-1.vtt    ← the captions       (already written — retime if needed)
+├── new-job-1.png    ← the still shown before it plays  (required)
 └── README.md        ← this file
 ```
 
@@ -22,9 +21,8 @@ the backend hands to the page, in
 ```kotlin
 private const val ASSET_ROOT = "/modules/listen-and-reflect"
 ...
-videoUrl   = "$ASSET_ROOT/new-job-1.mp4"
-posterUrl  = "$ASSET_ROOT/new-job-1.jpg"
-captionsUrl = "$ASSET_ROOT/new-job-1.vtt"
+videoUrl  = "$ASSET_ROOT/new-job-1.mp4"
+posterUrl = "$ASSET_ROOT/new-job-1.png"
 ```
 
 ---
@@ -51,22 +49,24 @@ with `ls -lh new-job-1.mp4`, and raise `-crf` (28, 30) if it's fat.
 ### 2. Grab the still frame
 
 ```bash
-ffmpeg -i new-job-1.mp4 -ss 00:00:02 -frames:v 1 -q:v 3 new-job-1.jpg
+ffmpeg -i new-job-1.mp4 -ss 00:00:02 -frames:v 1 -q:v 3 new-job-1.png
 ```
 
 Pick a second where she looks settled and isn't mid-blink — this is the first
 thing the learner sees. Try a different `-ss` value if the frame is unflattering.
 
-### 3. Check the length and retime the captions
+### 3. Check the length
 
 ```bash
 ffprobe -v error -show_entries format=duration -of csv=p=0 new-job-1.mp4
 ```
 
-The captions in `new-job-1.vtt` are timed for about 15 seconds of speech
-followed by a ~3 second hold — 18 seconds total. If yours is meaningfully
-different, edit the cue times in the `.vtt` and change `durationSeconds` in
-`Modules.kt` to match.
+`durationSeconds` in `Modules.kt` is 18 — about 15 seconds of speech followed by
+a ~3 second hold. If yours is meaningfully different, change it to match.
+
+There are no captions. The clip plays without a text track; her words live in
+`Beat.transcript` and are shown as a text card only when the video fails to
+load.
 
 ### 4. Let git keep the real files
 
@@ -74,7 +74,7 @@ different, edit the cue times in the `.vtt` and change `durationSeconds` in
 placeholders shouldn't be committed. Delete these two lines from it:
 
 ```
-/public/modules/**/*.mp4
+*.mp4
 /public/modules/**/*.jpg
 ```
 
@@ -87,10 +87,9 @@ Then `git add` this folder. You can also delete
 cd frontend && npm start
 ```
 
-Open the module, click into practice, and check three things:
+Open the module, click into practice, and check two things:
 
 - The video plays and the **Speak** button stays disabled until it ends.
-- Turning captions on shows text that matches what she's saying.
 - After the last word there's a pause where it feels like your turn.
 
 ---
@@ -115,7 +114,7 @@ The spoken line has to match `new-job-1.transcript` in `Modules.kt`:
 The feedback the learner gets is graded against a hand-written answer key tied to
 that sentence — the facts she gives, the feeling behind it. If the recording
 drifts ("a couple of weeks ago", or dropping "friendly"), correct reflections
-start getting marked wrong. Change the wording only by changing the transcript,
-the rubric, and the `.vtt` together.
+start getting marked wrong. Change the wording only by changing the transcript
+and the rubric together.
 
 Full direction for producing the clip: `plan/module-1-video-brief.md`.

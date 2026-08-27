@@ -27,3 +27,4 @@ yarn-error.log*
 # the two ignore lines below when the first real recording lands.
 /public/modules/**/*.mp4
 /public/modules/**/*.jpg
+/public/modules/**/*.png
