@@ -1,7 +1,12 @@
 import React from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import App from './App';
+
+// App reads the route, so it needs a router around it. MemoryRouter keeps that
+// entirely in memory — no jsdom history to reset between tests.
+const renderApp = () => render(<MemoryRouter><App /></MemoryRouter>);
 
 // Fixtures mirroring what the Ktor backend sends.
 const MODULE_SUMMARY = {
@@ -97,13 +102,13 @@ async function reflectWith(text: string) {
 
 test('the gym lists its modules', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   expect(await screen.findByRole('button', { name: /listen and reflect/i })).toBeInTheDocument();
 });
 
 test('the module intro names all three sub-skills before practice starts', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
 
   userEvent.click(await screen.findByRole('button', { name: /listen and reflect/i }));
 
@@ -114,7 +119,7 @@ test('the module intro names all three sub-skills before practice starts', async
 
 test('the learner can reply before the clip has finished', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
 
   // Nothing is blocked while she is still talking — only signposted.
@@ -130,7 +135,7 @@ test('the learner can reply before the clip has finished', async () => {
 
 test('taking your turn stops her talking', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
 
   const video = document.querySelector('video')!;
@@ -145,7 +150,7 @@ test('taking your turn stops her talking', async () => {
 
 test('her filmed words stay out of the transcript until the learner has replied', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -162,7 +167,7 @@ test('a retry does not log her line to the transcript twice', async () => {
   mockBackend({
     '/practices/p1/reflections': { ...REFLECTION, retry: true, nextBeat: undefined, level: 'DEVELOPING' },
   });
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -175,7 +180,7 @@ test('a retry does not log her line to the transcript twice', async () => {
 
 test('submitting a reflection shows all three checks, the feedback and a stronger reply', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -184,7 +189,7 @@ test('submitting a reflection shows all three checks, the feedback and a stronge
   // Wait for the real feedback — the pending card renders a scorecard too.
   await screen.findByText(REFLECTION.feedback);
 
-  const scorecard = screen.getByRole('list');
+  const scorecard = screen.getByRole('list', { name: /your reflection/i });
   const items = within(scorecard).getAllByRole('listitem');
   expect(items).toHaveLength(3);
 
@@ -202,7 +207,7 @@ test('submitting a reflection shows all three checks, the feedback and a stronge
 
 test('continuing moves to the written beat, which needs no clip', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -219,7 +224,7 @@ test('a written beat shows her line once, not on the stage and in the transcript
   mockBackend({
     '/practices/p1/reflections': { ...REFLECTION, nextBeat: undefined, complete: false, retry: true },
   });
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('error');
 
@@ -235,7 +240,7 @@ test('a written beat shows her line once, not on the stage and in the transcript
 
 test('the reply lands immediately and a pending card holds the place', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -263,7 +268,7 @@ test('the reply lands immediately and a pending card holds the place', async () 
 
 test('a failed reflection rolls the conversation back, draft included', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
   fireOnVideo('ended');
 
@@ -285,7 +290,7 @@ test('a failed reflection rolls the conversation back, draft included', async ()
 
 test('a missing clip falls back to her words rather than blocking the exercise', async () => {
   mockBackend();
-  render(<App />);
+  renderApp();
   await reachThePracticeRoom();
 
   fireOnVideo('error');

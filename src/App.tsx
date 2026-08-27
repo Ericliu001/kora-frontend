@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Navigate, Route, Routes, useNavigate, useParams } from 'react-router-dom';
 import './App.css';
 import { request } from './api';
+import SiteFooter from './components/SiteFooter';
+import SiteHeader from './components/SiteHeader';
 import {
   Beat,
   Check,
@@ -15,8 +18,6 @@ import {
   SubSkill,
   Utterance,
 } from './types';
-
-type Screen = 'modules' | 'intro' | 'practice' | 'recap';
 
 // ---------------------------------------------------------------------------
 // Presentation
@@ -48,7 +49,7 @@ function ReflectionScorecard({ checks }: { checks: Reflection['checks'] }) {
   };
 
   return (
-    <ul className="scorecard">
+    <ul className="scorecard" aria-label="Your reflection, check by check">
       {SUB_SKILL_ORDER.map((skill, index) => {
         const check = bySkill[skill];
         return (
@@ -91,7 +92,7 @@ function ReflectionPending() {
   return (
     <div className="feedback-panel" aria-busy="true">
       <p className="eyebrow">CHECKING YOUR REFLECTION</p>
-      <ul className="scorecard">
+      <ul className="scorecard" aria-label="Your reflection, check by check">
         {SUB_SKILL_ORDER.map((skill, index) => (
           <li key={skill} className="check pending" style={{ animationDelay: `${index * 140}ms` }}>
             <span className="check-mark" aria-hidden="true">
@@ -163,8 +164,75 @@ function BeatStage({
 // App
 // ---------------------------------------------------------------------------
 
+/**
+ * Loads whichever module the URL names.
+ *
+ * The fetch is keyed off the route param rather than off a click, which is what
+ * makes /modules/listen-and-reflect work when it is pasted into a fresh tab.
+ */
+function ModuleIntro({
+  moduleDetail,
+  isLoading,
+  onLoad,
+  onBack,
+  onStart,
+}: {
+  moduleDetail: ModuleDetail | null;
+  isLoading: boolean;
+  onLoad: (id: string) => void;
+  onBack: () => void;
+  onStart: () => void;
+}) {
+  const { moduleId } = useParams<{ moduleId: string }>();
+
+  useEffect(() => {
+    if (moduleId && moduleDetail?.id !== moduleId) onLoad(moduleId);
+  }, [moduleId, moduleDetail?.id, onLoad]);
+
+  if (!moduleDetail || moduleDetail.id !== moduleId) {
+    return (
+      <section className="intro-panel">
+        <p className="muted">Opening the module…</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="intro-panel">
+      <button className="back-button" onClick={onBack}>
+        ← All modules
+      </button>
+      <p className="eyebrow">{moduleDetail.skill.toUpperCase()}</p>
+      <h1>{moduleDetail.title}</h1>
+      <p className="intro">{moduleDetail.blurb}</p>
+
+      <ol className="teaches">
+        {moduleDetail.teaches.map((item, index) => (
+          <li key={item.skill}>
+            <span className="teach-number">{index + 1}</span>
+            <span>
+              <strong>{item.label}</strong>
+              <span>{item.description}</span>
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      <p className="muted small">
+        Repeating someone's exact words back isn't reflecting. The point is to show you understood —
+        not that you were recording.
+      </p>
+
+      <button className="primary-button" disabled={isLoading} onClick={onStart}>
+        {isLoading ? 'Starting…' : 'Start practising'}
+      </button>
+    </section>
+  );
+}
+
 function App() {
-  const [screen, setScreen] = useState<Screen>('modules');
+  const navigate = useNavigate();
+
   const [modules, setModules] = useState<ModuleSummary[]>([]);
   const [moduleDetail, setModuleDetail] = useState<ModuleDetail | null>(null);
 
@@ -233,18 +301,19 @@ function App() {
     }
   }, [beat, hasClip, revealHerLine]);
 
-  const openModule = async (id: string) => {
+  const openModule = (id: string) => navigate(`/modules/${id}`);
+
+  const loadModule = useCallback(async (id: string) => {
     setIsLoading(true);
     setError('');
     try {
       setModuleDetail(await request<ModuleDetail>(`/modules/${id}`));
-      setScreen('intro');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to open that module.');
     } finally {
       setIsLoading(false);
     }
-  };
+  }, []);
 
   const startPractice = async () => {
     if (!moduleDetail) return;
@@ -263,7 +332,8 @@ function App() {
       setVideoFailed(false);
       setClipWatched(!practice.beat.videoUrl);
       setBeat(practice.beat);
-      setScreen('practice');
+      // Last, so the route guard sees a practice in flight when it renders.
+      navigate('/practice');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to start practising.');
     } finally {
@@ -331,7 +401,7 @@ function App() {
     setError('');
     try {
       setRecap(await request<Recap>(`/practices/${practiceId}/complete`, { method: 'POST' }));
-      setScreen('recap');
+      navigate('/recap');
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'Unable to build your recap.');
     } finally {
@@ -395,7 +465,6 @@ function App() {
   };
 
   const restart = () => {
-    setScreen('modules');
     setModuleDetail(null);
     setPracticeId(null);
     setBeat(null);
@@ -406,6 +475,7 @@ function App() {
     setError('');
     setBusy(null);
     loggedRef.current = new Set();
+    navigate('/');
   };
 
   // Replying before she has finished is allowed. Cutting someone off is a real
@@ -420,206 +490,208 @@ function App() {
     if (video && !video.paused) video.pause();
   };
 
-  return (
-    <main className="app-shell">
-      <header className="topbar">
-        <button className="brand" onClick={restart} aria-label="Back to the gym">
-          kora<span>•</span>
-        </button>
-        <p>One conversation skill at a time.</p>
-      </header>
-
-      {error && (
-        <div className="error-banner" role="alert">
-          {error}
-        </div>
-      )}
-
-      {screen === 'modules' && (
-        <section className="landing">
+  const landing = (
+    <>
+      <section className="hero bg-pattern-onion-hero">
+        <div className="hero-content">
           <p className="eyebrow">THE CONVERSATION GYM</p>
           <h1>Practise one skill until it's yours.</h1>
-          <p className="intro">
+          <p>
             Short, repeatable exercises. Someone tells you something real, you reply out loud, and
             you find out exactly what you caught and what you missed.
           </p>
-          <div className="module-grid">
-            {isLoading && <p className="muted">Opening the gym…</p>}
-            {modules.map((module) => (
-              <ModuleCard key={module.id} module={module} onChoose={() => openModule(module.id)} />
+        </div>
+      </section>
+
+      <div className="container landing">
+        <div className="module-grid">
+          {isLoading && <p className="muted">Opening the gym…</p>}
+          {modules.map((module) => (
+            <ModuleCard key={module.id} module={module} onChoose={() => openModule(module.id)} />
+          ))}
+        </div>
+      </div>
+    </>
+  );
+
+  const practice = beat ? (
+    <section className="practice-layout">
+      <aside className="practice-side">
+        <p className="eyebrow">PRACTISING</p>
+        <h2>{moduleDetail?.title ?? 'Listen and reflect'}</h2>
+        <p className="muted small">Turn {beat.turnNumber}</p>
+        <button
+          className="quiet-button"
+          onClick={finish}
+          disabled={isLoading || utterances.every((line) => line.speaker === 'THEM')}
+        >
+          Finish &amp; see recap
+        </button>
+      </aside>
+
+      <div className="practice-panel">
+        {hasClip && (
+          <BeatStage
+            beat={beat}
+            videoRef={videoRef}
+            onEnded={() => setClipWatched(true)}
+            onUnavailable={() => setVideoFailed(true)}
+          />
+        )}
+
+        {utterances.length > 0 && (
+          <div className="transcript" aria-live="polite">
+            {utterances.map((line, index) => (
+              <article
+                className={`utterance ${line.speaker.toLowerCase()}`}
+                key={`${line.speaker}-${index}`}
+              >
+                <span>{line.name}</span>
+                <p>{line.text}</p>
+              </article>
             ))}
           </div>
-        </section>
-      )}
+        )}
 
-      {screen === 'intro' && moduleDetail && (
-        <section className="intro-panel">
-          <button className="back-button" onClick={restart}>
-            ← All modules
-          </button>
-          <p className="eyebrow">{moduleDetail.skill.toUpperCase()}</p>
-          <h1>{moduleDetail.title}</h1>
-          <p className="intro">{moduleDetail.blurb}</p>
+        {busy === 'assessing' ? (
+          <ReflectionPending />
+        ) : reflection ? (
+          <div className="feedback-panel">
+            <p className="eyebrow">{LEVEL_LABEL[reflection.level].toUpperCase()}</p>
+            <ReflectionScorecard checks={reflection.checks} />
+            <p className="feedback-line">{reflection.feedback}</p>
 
-          <ol className="teaches">
-            {moduleDetail.teaches.map((item, index) => (
-              <li key={item.skill}>
-                <span className="teach-number">{index + 1}</span>
-                <span>
-                  <strong>{item.label}</strong>
-                  <span>{item.description}</span>
-                </span>
-              </li>
-            ))}
-          </ol>
+            <div className="exemplar">
+              <p className="card-kicker">
+                {reflection.level === 'BEST' ? 'ANOTHER STRONG REPLY' : 'A STRONGER REPLY'}
+              </p>
+              <blockquote>“{reflection.exemplar.text}”</blockquote>
+            </div>
 
-          <p className="muted small">
-            Repeating someone's exact words back isn't reflecting. The point is to show you
-            understood — not that you were recording.
-          </p>
-
-          <button className="primary-button" disabled={isLoading} onClick={startPractice}>
-            {isLoading ? 'Starting…' : 'Start practising'}
-          </button>
-        </section>
-      )}
-
-      {screen === 'practice' && beat && (
-        <section className="practice-layout">
-          <aside className="practice-side">
-            <p className="eyebrow">PRACTISING</p>
-            <h2>{moduleDetail?.title ?? 'Listen and reflect'}</h2>
-            <p className="muted small">Turn {beat.turnNumber}</p>
-            <button
-              className="quiet-button"
-              onClick={finish}
-              disabled={isLoading || utterances.every((line) => line.speaker === 'THEM')}
-            >
-              Finish &amp; see recap
+            <button className="primary-button" onClick={continueAfterFeedback} disabled={isLoading}>
+              {reflection.retry
+                ? 'Try that again'
+                : reflection.complete
+                  ? 'See your recap →'
+                  : 'Continue →'}
             </button>
-          </aside>
-
-          <div className="practice-panel">
-            {hasClip && (
-              <BeatStage
-                beat={beat}
-                videoRef={videoRef}
-                onEnded={() => setClipWatched(true)}
-                onUnavailable={() => setVideoFailed(true)}
-              />
-            )}
-
-            {utterances.length > 0 && (
-              <div className="transcript" aria-live="polite">
-                {utterances.map((line, index) => (
-                  <article
-                    className={`utterance ${line.speaker.toLowerCase()}`}
-                    key={`${line.speaker}-${index}`}
-                  >
-                    <span>{line.name}</span>
-                    <p>{line.text}</p>
-                  </article>
-                ))}
-              </div>
-            )}
-
-            {busy === 'assessing' ? (
-              <ReflectionPending />
-            ) : reflection ? (
-              <div className="feedback-panel">
-                <p className="eyebrow">{LEVEL_LABEL[reflection.level].toUpperCase()}</p>
-                <ReflectionScorecard checks={reflection.checks} />
-                <p className="feedback-line">{reflection.feedback}</p>
-
-                <div className="exemplar">
-                  <p className="card-kicker">
-                    {reflection.level === 'BEST' ? 'ANOTHER STRONG REPLY' : 'A STRONGER REPLY'}
-                  </p>
-                  <blockquote>“{reflection.exemplar.text}”</blockquote>
-                </div>
-
-                <button className="primary-button" onClick={continueAfterFeedback} disabled={isLoading}>
-                  {reflection.retry
-                    ? 'Try that again'
-                    : reflection.complete
-                      ? 'See your recap →'
-                      : 'Continue →'}
-                </button>
-              </div>
+          </div>
+        ) : (
+          <div className="composer">
+            <label htmlFor="reflection-draft">What would you say back to {beat.speaker}?</label>
+            <textarea
+              id="reflection-draft"
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Speak or type your reply…"
+              rows={3}
+              disabled={!canRespond && !isRecording}
+            />
+            <div className="composer-actions">
+              <button
+                className={isRecording ? 'record-button recording' : 'record-button'}
+                onClick={toggleRecording}
+                disabled={(isLoading && !isRecording) || !!reflection}
+              >
+                {isRecording ? '■ Stop recording' : '● Speak'}
+              </button>
+              <button
+                className="primary-button send-button"
+                onClick={submitReflection}
+                disabled={!canRespond || !draft.trim()}
+              >
+                Reflect back →
+              </button>
+            </div>
+            {busy === 'transcribing' ? (
+              <p className="pending-note" role="status">
+                Writing down what you said…
+              </p>
             ) : (
-              <div className="composer">
-                <label htmlFor="reflection-draft">
-                  What would you say back to {beat.speaker}?
-                </label>
-                <textarea
-                  id="reflection-draft"
-                  value={draft}
-                  onChange={(event) => setDraft(event.target.value)}
-                  placeholder="Speak or type your reply…"
-                  rows={3}
-                  disabled={!canRespond && !isRecording}
-                />
-                <div className="composer-actions">
-                  <button
-                    className={isRecording ? 'record-button recording' : 'record-button'}
-                    onClick={toggleRecording}
-                    disabled={(isLoading && !isRecording) || !!reflection}
-                  >
-                    {isRecording ? '■ Stop recording' : '● Speak'}
-                  </button>
-                  <button
-                    className="primary-button send-button"
-                    onClick={submitReflection}
-                    disabled={!canRespond || !draft.trim()}
-                  >
-                    Reflect back →
-                  </button>
-                </div>
-                {busy === 'transcribing' ? (
-                  <p className="pending-note" role="status">
-                    Writing down what you said…
-                  </p>
-                ) : (
-                  sheIsStillTalking && (
-                    <p className="composer-hint">
-                      {beat.speaker} is still talking — reply whenever you're ready.
-                    </p>
-                  )
-                )}
-                <span className="visually-hidden" role="status">
-                  {isRecording ? 'Recording your reply' : ''}
-                </span>
-              </div>
+              sheIsStillTalking && (
+                <p className="composer-hint">
+                  {beat.speaker} is still talking — reply whenever you're ready.
+                </p>
+              )
             )}
+            <span className="visually-hidden" role="status">
+              {isRecording ? 'Recording your reply' : ''}
+            </span>
           </div>
-        </section>
-      )}
+        )}
+      </div>
+    </section>
+  ) : (
+    // Someone landed on /practice cold, or reloaded mid-exercise. There is no
+    // conversation to resume — the transcript only ever lived in memory.
+    <Navigate to="/" replace />
+  );
 
-      {screen === 'recap' && recap && (
-        <section className="recap-panel">
-          <p className="eyebrow">PRACTICE COMPLETE</p>
-          <h1>You listened for {recap.turnsCompleted === 1 ? 'a turn' : 'the whole conversation'}.</h1>
-          <p className="intro">{recap.summary}</p>
+  return (
+    <div className="app-shell">
+      <SiteHeader />
 
-          <div className="level-run">
-            {recap.levels.map((level, index) => (
-              <span className={`level-pip ${level.toLowerCase()}`} key={index}>
-                {LEVEL_LABEL[level]}
-              </span>
-            ))}
+      <main>
+        {error && (
+          <div className="error-banner" role="alert">
+            {error}
           </div>
+        )}
 
-          <div className="exemplar">
-            <p className="card-kicker">ONE TO KEEP</p>
-            <blockquote>“{recap.suggestedLine}”</blockquote>
-          </div>
+        <Routes>
+          <Route path="/" element={landing} />
+          <Route
+            path="/modules/:moduleId"
+            element={
+              <ModuleIntro
+                moduleDetail={moduleDetail}
+                isLoading={isLoading}
+                onLoad={loadModule}
+                onBack={restart}
+                onStart={startPractice}
+              />
+            }
+          />
+          <Route path="/practice" element={practice} />
+          <Route
+            path="/recap"
+            element={
+              recap ? (
+                <section className="recap-panel">
+                  <p className="eyebrow">PRACTICE COMPLETE</p>
+                  <h1>
+                    You listened for {recap.turnsCompleted === 1 ? 'a turn' : 'the whole conversation'}.
+                  </h1>
+                  <p className="intro">{recap.summary}</p>
 
-          <button className="primary-button" onClick={restart}>
-            Back to the gym
-          </button>
-        </section>
-      )}
-    </main>
+                  <div className="level-run">
+                    {recap.levels.map((level, index) => (
+                      <span className={`level-pip ${level.toLowerCase()}`} key={index}>
+                        {LEVEL_LABEL[level]}
+                      </span>
+                    ))}
+                  </div>
+
+                  <div className="exemplar">
+                    <p className="card-kicker">ONE TO KEEP</p>
+                    <blockquote>“{recap.suggestedLine}”</blockquote>
+                  </div>
+
+                  <button className="primary-button" onClick={restart}>
+                    Back to the gym
+                  </button>
+                </section>
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </main>
+
+      <SiteFooter />
+    </div>
   );
 }
 

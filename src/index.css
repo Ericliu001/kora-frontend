@@ -1,14 +1,81 @@
+/* Onion Loop design tokens.
+ *
+ * Ported from onion-loop-website/styles.css so Kora and the marketing site
+ * speak the same visual language. Everything downstream — App.css, the chrome
+ * components — reads from these and nothing else, which is what lets the whole
+ * app flip themes by setting one attribute on <html>.
+ */
+
+:root {
+  --primary-color: #4F46E5;   /* Indigo 600 */
+  --primary-dark: #4338CA;    /* Indigo 700 */
+  /* Text that sits ON a primary-coloured surface. It has to flip with the
+   * theme: dark mode lightens --primary-color to indigo 400, and white on
+   * indigo 400 is about 2.9:1 — unreadable, and the reason this token exists. */
+  --on-primary: #ffffff;
+  --secondary-color: #FF17A6; /* Logo pink */
+  --text-dark: #1f2937;
+  --text-light: #6b7280;
+  --bg-light: #f9fafb;
+  --white: #ffffff;
+  --border-color: #e5e7eb;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04);
+
+  /* Feedback states. The gym needs success/warn/danger surfaces that the
+   * marketing site never had, so they are defined here rather than baked into
+   * a rule — otherwise they survive the theme switch as light-mode colours. */
+  /* The wash values below are tuned, not picked: --text-light on the
+   * success/warn washes, and --primary-color on --tint in dark, all sit
+   * just under WCAG AA at rounder numbers. Nudged until they clear 4.5:1. */
+  --tint: #eef1fe;            /* faint primary wash — selected, pending rows */
+  --success: #15803d;
+  --success-bg: #f2faf5;
+  --warn: #b45309;
+  --warn-bg: #fef8f0;
+  --danger: #be3f3f;
+  --danger-bg: #fbe5dd;
+  --danger-text: #8d3215;
+  --stage: #1b1830;           /* letterbox behind a video */
+}
+
+[data-theme="dark"] {
+  --primary-color: #818CF8;   /* Indigo 400 */
+  --primary-dark: #6366F1;    /* Indigo 500 */
+  --on-primary: #111827;
+  --secondary-color: #FF17A6;
+  --text-dark: #f9fafb;
+  --text-light: #d1d5db;
+  --bg-light: #111827;
+  --white: #1f2937;
+  --border-color: #374151;
+  --shadow: 0 4px 6px -1px rgba(0, 0, 0, .3), 0 2px 4px -1px rgba(0, 0, 0, .2);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, .4), 0 10px 10px -5px rgba(0, 0, 0, .3);
+
+  --tint: #242b45;
+  --success: #6ee7a8;
+  --success-bg: #1c3a2c;
+  --warn: #fbbf5c;
+  --warn-bg: #3b3018;
+  --danger: #fca5a5;
+  --danger-bg: #45211d;
+  --danger-text: #fecaca;
+  --stage: #0b1020;
+}
+
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.6;
+  color: var(--text-dark);
+  background-color: var(--bg-light);
+  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: #fbf8f1;
+  transition: background-color .3s ease, color .3s ease;
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }

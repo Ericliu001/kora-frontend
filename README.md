@@ -33,16 +33,56 @@ REACT_APP_API_BASE_URL="https://your-api.example.com/api" npm start
 
 ## Where the frontend starts
 
-The browser starts at [index.tsx](src/index.tsx). It finds the `root` element in `public/index.html` and renders `<App />`.
+The browser starts at [index.tsx](src/index.tsx). It finds the `root` element in `public/index.html`
+and renders `<App />` inside a `<BrowserRouter>`. The router lives there rather than inside `App` so
+tests can mount `App` under a `MemoryRouter` and drive navigation without touching the address bar.
 
-[App.tsx](src/App.tsx) is the main Kora screen. It currently contains:
+[App.tsx](src/App.tsx) holds app-wide state — the chosen module, the practice in flight, the
+transcript, microphone recording and transcription upload — and renders the four screens as routes.
 
-- API request helper and TypeScript data shapes
-- App-wide state, such as the selected scenario and current session
-- Microphone recording and transcription upload
-- The scenario picker, opening choice, practice room, and recap screen
+## Brand and theming
 
-[App.css](src/App.css) contains the visual design and responsive mobile layout.
+Kora wears the Onion Loop brand. The whole palette lives as CSS custom properties in
+[index.css](src/index.css) — one `:root` block for light, one `[data-theme="dark"]` block for dark —
+and **no rule in [App.css](src/App.css) names a colour directly**. That is what lets the app switch
+theme by setting one attribute on `<html>`, with no component re-rendering.
+
+If you add a colour, add a token. A hex baked into a rule is a light-mode colour that survives the
+theme switch and breaks dark mode.
+
+A few wash values (`--success-bg`, `--warn-bg`, and `--tint` in dark) look like odd numbers because
+they are: at rounder values the text on them lands just under WCAG AA 4.5:1. Check contrast before
+rounding them off.
+
+| Piece | Where |
+| --- | --- |
+| Tokens, light and dark | [src/index.css](src/index.css) |
+| Component styling | [src/App.css](src/App.css) |
+| Header, footer | [src/components/SiteHeader.tsx](src/components/SiteHeader.tsx), [SiteFooter.tsx](src/components/SiteFooter.tsx) |
+| Theme state | [src/hooks/useTheme.ts](src/hooks/useTheme.ts) |
+| Pre-paint theme (stops the dark-mode flash) | inline script in [public/index.html](public/index.html) |
+| Logo, onion pattern | `public/brand/`, `src/assets/onion-pattern.svg` |
+
+The preference is stored under the `theme` key in `localStorage` — the same key the marketing site
+at onionloop.com uses, so a visitor's choice carries across both.
+
+> The onion pattern is imported from `src/assets/`, not `public/`. A root-absolute `url('/…')` in a
+> CRA stylesheet fails to resolve at build time; importing it from `src/` also gets it fingerprinted.
+
+## Routes
+
+| Route | Screen |
+| --- | --- |
+| `/` | The module list |
+| `/modules/:moduleId` | Module intro — fetches from the URL param, so it deep-links |
+| `/practice` | The practice room |
+| `/recap` | The recap |
+
+`/practice` and `/recap` redirect to `/` when there is nothing in flight: a practice lives in memory
+only, so there is no conversation to resume after a reload.
+
+Client-side routing needs the host to serve `index.html` for every path. `public/_redirects` covers
+Netlify; on GitHub Pages, copy `index.html` to `404.html` after building.
 
 ## How data moves through the web app
 
