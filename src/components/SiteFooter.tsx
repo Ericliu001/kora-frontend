@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 /**
  * The marketing pages live on the static site, not in this app, so those links
- * are absolute and leave. Only the gym's own routes stay internal.
+ * are absolute and leave. Only the training ground's own routes stay internal.
  */
 const SITE = 'https://onionloop.com';
 
@@ -29,7 +29,7 @@ export default function SiteFooter() {
         <div className="footer-section">
           <h3>Kora</h3>
           <ul>
-            <li><Link to="/">All modules</Link></li>
+            <li><Link to="/">All units</Link></li>
             <li><a href={`${SITE}/services.html`}>Why we built it</a></li>
           </ul>
         </div>

@@ -14,23 +14,51 @@ export interface SubSkillInfo {
   purpose: string;
 }
 
-export interface ModuleSummary {
+/**
+ * One of the three things the training ground teaches, with everything under it.
+ *
+ * The whole curriculum arrives in one response — including the units nobody has
+ * written yet — so the browser holds no list of its own to drift out of step.
+ */
+export interface CatalogModule {
   id: string;
   title: string;
-  skill: string;
   blurb: string;
-  subSkillCount: number;
-  estimatedMinutes: number;
+  units: UnitSummary[];
 }
 
-export interface ModuleDetail {
+/**
+ * A unit as the catalogue lists it.
+ *
+ * The optional four are what a unit that has not been written yet does not
+ * have. Absent rather than zero, so a locked tile leaves the line out instead
+ * of claiming "0 sub-skills · about 0 min".
+ */
+export interface UnitSummary {
   id: string;
+  moduleId: string;
   title: string;
-  skill: string;
   blurb: string;
-  estimatedMinutes: number;
+  playable: boolean;
+  skill?: string | null;
+  subSkillCount?: number | null;
+  estimatedMinutes?: number | null;
+  coverUrl?: string | null;
+}
+
+/**
+ * A practice, as it begins.
+ *
+ * [teaches] rides along deliberately. It is what the composer puts in front of
+ * the learner before they reply, and carrying it here is what lets a click on a
+ * tile go straight into practice with no page in between to fetch it.
+ */
+export interface Practice {
+  id: string;
+  unitId: string;
+  unitTitle: string;
   teaches: SubSkillInfo[];
-  exerciseCount: number;
+  beat: Beat;
 }
 
 /** One thing the speaker says. `videoUrl` is absent on written beats. */
@@ -43,12 +71,6 @@ export interface Beat {
   audioUrl?: string;
   posterUrl?: string;
   durationSeconds?: number;
-}
-
-export interface Practice {
-  id: string;
-  moduleId: string;
-  beat: Beat;
 }
 
 export interface Check {
@@ -95,6 +117,22 @@ export interface Utterance {
   name: string;
   text: string;
 }
+
+/**
+ * Mirrors MAX_ATTEMPTS_PER_BEAT in backend/.../plugins/GymRouting.kt.
+ *
+ * The server decides when a learner has had enough tries; this copy exists
+ * only so the composer can say how many are left. If the two ever disagree,
+ * the server is right and this line is the bug.
+ */
+export const MAX_ATTEMPTS_PER_BEAT = 3;
+
+/** The three checks, addressable by sub-skill rather than by field name. */
+export const checkBySkill = (checks: Checks): Record<SubSkill, Check> => ({
+  FACTS: checks.facts,
+  FEELING: checks.feeling,
+  INVITATION: checks.invitation,
+});
 
 export const SUB_SKILL_ORDER: SubSkill[] = ['FACTS', 'FEELING', 'INVITATION'];
 

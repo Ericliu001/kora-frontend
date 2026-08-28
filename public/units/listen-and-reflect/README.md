@@ -3,27 +3,31 @@
 **Put the finished clip in this folder, named exactly `new-job-1.mp4`.**
 
 ```
-frontend/public/modules/listen-and-reflect/
-├── new-job-1.mp4    ← the video          (required)
+frontend/public/units/listen-and-reflect/
+├── new-job-1.mp4    ← the video                        (required)
 ├── new-job-1.png    ← the still shown before it plays  (required)
 └── README.md        ← this file
 ```
 
-Three placeholder files are sitting there now. **Overwrite them.** The names and
-the folder are what the app looks for — get those right and nothing in the code
-needs to change.
+The names and the folder are what the app looks for — get those right and
+nothing in the code needs to change.
 
 Anything under `frontend/public/` is served at the site root, so this folder is
-reachable in the browser at `/modules/listen-and-reflect/…`. That is the path
-the backend hands to the page, in
-`backend/src/main/kotlin/com/buddygo/gym/Modules.kt`:
+reachable in the browser at `/units/listen-and-reflect/…`. That is the path the
+backend hands to the page, in
+`backend/src/main/kotlin/com/buddygo/gym/units/ListenAndReflect.kt`:
 
 ```kotlin
-private const val ASSET_ROOT = "/modules/listen-and-reflect"
+private const val ASSET_ROOT = "/units/listen-and-reflect"
 ...
 videoUrl  = "$ASSET_ROOT/new-job-1.mp4"
 posterUrl = "$ASSET_ROOT/new-job-1.png"
 ```
+
+`new-job-1.png` does double duty: it is the poster on the video element **and**
+the unit's cover image in the home-page grid (`coverUrl` on the unit). A unit
+with no cover falls back to a generated gradient tile, so a missing file is
+untidy rather than broken.
 
 ---
 
@@ -34,7 +38,7 @@ posterUrl = "$ASSET_ROOT/new-job-1.png"
 From the repository root:
 
 ```bash
-cd frontend/public/modules/listen-and-reflect
+cd frontend/public/units/listen-and-reflect
 
 ffmpeg -i /path/to/your-raw-video.mp4 \
   -c:v libx264 -pix_fmt yuv420p -vf "scale=1280:-2" \
@@ -53,7 +57,8 @@ ffmpeg -i new-job-1.mp4 -ss 00:00:02 -frames:v 1 -q:v 3 new-job-1.png
 ```
 
 Pick a second where she looks settled and isn't mid-blink — this is the first
-thing the learner sees. Try a different `-ss` value if the frame is unflattering.
+thing the learner sees, on the tile as well as on the stage. Try a different
+`-ss` value if the frame is unflattering.
 
 ### 3. Check the length
 
@@ -61,51 +66,43 @@ thing the learner sees. Try a different `-ss` value if the frame is unflattering
 ffprobe -v error -show_entries format=duration -of csv=p=0 new-job-1.mp4
 ```
 
-`durationSeconds` in `Modules.kt` is 18 — about 15 seconds of speech followed by
-a ~3 second hold. If yours is meaningfully different, change it to match.
+`durationSeconds` in `ListenAndReflect.kt` is 18 — about 15 seconds of speech
+followed by a ~3 second hold. If yours is meaningfully different, change it to
+match.
 
 There are no captions. The clip plays without a text track; her words live in
 `Beat.transcript` and are shown as a text card only when the video fails to
 load.
 
-### 4. Let git keep the real files
-
-`frontend/.gitignore` currently ignores everything in here, because the
-placeholders shouldn't be committed. Delete these two lines from it:
-
-```
-*.mp4
-/public/modules/**/*.jpg
-```
-
-Then `git add` this folder. You can also delete
-`frontend/scripts/make-placeholder-clips.sh` — you won't need stand-ins again.
-
-### 5. Look at it
+### 4. Look at it
 
 ```bash
 cd frontend && npm start
 ```
 
-Open the module, click into practice, and check two things:
+Click the unit on the home page — that takes you straight into the practice
+room, there is no page in between — and check two things:
 
-- The video plays and the **Speak** button stays disabled until it ends.
-- After the last word there's a pause where it feels like your turn.
+- The video plays, and the poster you chose is what the tile shows in the grid.
+- Replying before she finishes is *allowed*. Cutting someone off is a real thing
+  people do, and blocking the controls taught nothing about it. The composer
+  says "Nadia is still talking — reply whenever you're ready" and stays usable.
 
 ---
 
 ## If the video doesn't play
 
 The app is built to survive this: when a clip fails to load, her words appear as
-text instead and the exercise carries on. So if you see her line as a text card
-rather than a video, the file is missing, misnamed, or in a codec the browser
-won't take — check the filename first, then re-run step 1.
+text instead and the exercise carries on with no error message — the failure has
+already been handled, and an alert about it would be noise. So if you see her
+line as a text card rather than a video, the file is missing, misnamed, or in a
+codec the browser won't take — check the filename first, then re-run step 1.
 
 ---
 
 ## The words must match the code
 
-The spoken line has to match `new-job-1.transcript` in `Modules.kt`:
+The spoken line has to match `new-job-1.transcript` in `ListenAndReflect.kt`:
 
 > "I started a new job last week. Everyone's been really friendly, but there's
 > so much to learn — new systems, new names, a whole way of doing things.

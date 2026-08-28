@@ -1,6 +1,6 @@
 # Kora frontend
 
-This is Kora's React web app. It lets someone choose a small-talk scenario, speak or type a response, hear the character reply, and receive short coaching after every turn.
+This is Kora's React web app: a training ground for learning to talk to people. Three modules — Skills, Emotions, Heart — each holding units. A learner picks a unit, watches someone say something real, replies by voice or text, and finds out exactly what they caught and what they missed.
 
 ## Run it
 
@@ -37,8 +37,9 @@ The browser starts at [index.tsx](src/index.tsx). It finds the `root` element in
 and renders `<App />` inside a `<BrowserRouter>`. The router lives there rather than inside `App` so
 tests can mount `App` under a `MemoryRouter` and drive navigation without touching the address bar.
 
-[App.tsx](src/App.tsx) holds app-wide state — the chosen module, the practice in flight, the
-transcript, microphone recording and transcription upload — and renders the four screens as routes.
+[App.tsx](src/App.tsx) is a shell: the chrome, the routes, and the error banner. The state lives in
+two hooks it calls — `useCatalog` for what the home page lists, `usePractice` for the one conversation
+in flight — and the screens read them.
 
 ## Brand and theming
 
@@ -73,12 +74,21 @@ at onionloop.com uses, so a visitor's choice carries across both.
 
 | Route | Screen |
 | --- | --- |
-| `/` | The module list |
-| `/modules/:moduleId` | Module intro — fetches from the URL param, so it deep-links |
-| `/practice` | The practice room |
-| `/recap` | The recap |
+| `/` | The training ground: three module sections of unit tiles |
+| `/units/:unitId` | The practice room |
+| `/units/:unitId/recap` | The recap |
+| `/modules/:moduleId` | Redirects to `/units/:moduleId` — bookmarks from before units had their own name |
 
-`/practice` and `/recap` redirect to `/` when there is nothing in flight: a practice lives in memory
+There is no page between the grid and the practice room. Clicking a tile creates the practice and
+then navigates, in that order, so a failure leaves the learner on the home page beside the tile they
+clicked rather than on a practice screen that would have to explain itself. The same `start()` runs
+from the other direction when `/units/:unitId` is pasted into a fresh tab.
+
+A unit that is in the catalogue but has no exercises yet is answered from the catalogue — that URL
+says "isn't built yet" without asking the server, because the server would give the same answer one
+round trip later.
+
+`/units/:unitId/recap` redirects to `/` when there is nothing in flight: a practice lives in memory
 only, so there is no conversation to resume after a reload.
 
 Client-side routing needs the host to serve `index.html` for every path. `public/_redirects` covers
@@ -88,120 +98,65 @@ Netlify; on GitHub Pages, copy `index.html` to `404.html` after building.
 
 ```mermaid
 flowchart TD
-    Start[index.tsx renders App] --> Scenarios[Load scenarios]
-    Scenarios --> Choose[User chooses a scenario]
-    Choose --> Session[Create a practice session]
-    Session --> Practice[Conversation room]
-    Practice --> Type[Type a response]
-    Practice --> Speak[Record voice]
-    Speak --> Transcribe[Upload audio for transcription]
-    Transcribe --> Edit[Show editable transcript]
-    Type --> Send[Send text turn]
-    Edit --> Send
-    Send --> Reply[Show character reply, coaching, and audio]
-    Reply --> Practice
-    Reply --> Finish[Finish practice]
-    Finish --> Recap[Show final recap]
+    Start[index.tsx renders App] --> Catalog[GET /api/catalog]
+    Catalog --> Grid[Three module sections of unit tiles]
+    Grid --> Click[Click a unit that is built]
+    Click --> Create[POST /api/practices with unitId]
+    Create --> Room[Practice room, turn 1]
+    Room --> Type[Type a reply]
+    Room --> Speak[Record voice]
+    Speak --> Transcribe[POST .../transcribe]
+    Transcribe --> Type
+    Type --> Send[POST .../reflections]
+    Send --> Feedback[Three checks, one coaching line, a stronger reply]
+    Feedback --> Retry[Same beat, another go]
+    Retry --> Room
+    Feedback --> Next[Next beat]
+    Next --> Room
+    Feedback --> Finish[POST .../complete]
+    Finish --> Recap[Recap]
 ```
 
-The API base URL is set near the top of `App.tsx`:
+Every request goes through `request<T>()` in [src/api.ts](src/api.ts). It sets JSON headers for
+normal requests, leaves `FormData` untouched for audio uploads, and gives everything a timeout —
+10s, or 45s for the two calls that wait on a model.
 
-```ts
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || 'http://localhost:8080/api';
-```
+## Where the pieces live
 
-The `request<T>()` helper below it makes every backend request. It adds JSON headers for normal requests and leaves `FormData` untouched for audio uploads.
-
-## Screen flow
-
-### 1. Scenario picker
-
-When `App` first renders, a `useEffect` calls:
-
-```text
-GET /api/scenarios
-```
-
-The returned scenarios become the three cards shown on the landing page. Clicking a card stores the chosen `Scenario` in React state and moves to the opening-choice screen.
-
-### 2. Who starts?
-
-The user selects either:
-
-- `CHARACTER_GREETS` — Kora asks the backend for the character's greeting.
-- `USER_STARTS` — the conversation room begins with an empty chat and an opening suggestion.
-
-Clicking **Begin practice** creates a session first:
-
-```text
-POST /api/sessions
-```
-
-Then, only when the character starts:
-
-```text
-POST /api/sessions/{id}/opening
-```
-
-The returned `Session` object holds the id, selected scenario, opening mode, and existing messages.
-
-### 3. Practising a turn
-
-There are two ways to make a response:
-
-| User action | What the app does |
+| Piece | Where |
 | --- | --- |
-| Type in the text area | Keeps the text in `draft` state. |
-| Press **Speak** | Requests microphone access, records with `MediaRecorder`, and uploads the recording as `FormData`. |
+| Shell, routes, error banner | [src/App.tsx](src/App.tsx) |
+| The curriculum, as fetched | [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) |
+| One practice, start to recap | [src/hooks/usePractice.ts](src/hooks/usePractice.ts) |
+| Microphone and transcription | [src/hooks/useVoiceInput.ts](src/hooks/useVoiceInput.ts) |
+| Screens | [src/screens/](src/screens) |
+| Everything a screen is made of | [src/components/](src/components) |
+| HTTP, and the two failure types | [src/api.ts](src/api.ts) |
+| What a failure means, and its words | [src/errors.ts](src/errors.ts) |
+| Wire types mirroring the Kotlin | [src/types.ts](src/types.ts) |
 
-Voice upload calls:
+`usePractice` is called once, in `App`, and handed to the screens that need it. A practice outlives
+the screen that started it — the recap is a different route reading the same conversation — and two
+consumers is not enough to justify a context.
 
-```text
-POST /api/sessions/{id}/transcribe
-```
+## Errors
 
-The transcript is placed in the same editable text area. Nothing is automatically sent: the learner can correct it before pressing **Send**.
+There is no generic "something went wrong" any more. Every failure leaves `api.ts` as one of two
+types (`NetworkError`, `ApiError`), `toAppError` in [src/errors.ts](src/errors.ts) turns it into an
+`AppError` with a `kind`, and the `kind` decides where it is shown:
 
-Sending a turn calls:
+| Where | Which failures | Why there |
+| --- | --- | --- |
+| Banner, above the page | offline, timeout, 5xx | The page still works. Dismissible, and cleared on navigation, so an error raised on one screen cannot follow you to the next. Carries **Try again**, because the same request could work twice. |
+| Inline, by the control | a 4xx with a message, no microphone, microphone refused | Fixing the input *is* the retry. The server's own words are used verbatim — it knows what was wrong with the request and we do not. |
+| Page, replacing the content | unknown unit (404), unit not built yet (409), practice finished (409), catalogue failed to load | There is nothing else on the page worth showing. |
 
-```text
-POST /api/sessions/{id}/turns
-```
+Two things are deliberately silent: a clip that will not load (the transcript takes over and the
+exercise carries on — an alert about a handled failure is noise), and the server's own message on a
+5xx (it can be a stack detail; the fixed copy is what a person reads).
 
-The interface immediately displays the user's message, then appends the character's reply when the server responds. The coaching suggestion and tags update beneath the composer.
+## Adding a unit
 
-If the server includes `audioBase64`, `playAudio()` turns it into a browser audio source and plays the character's reply. If audio is unavailable, the conversation still works as text.
-
-### 4. Recap
-
-**Finish & see recap** calls:
-
-```text
-POST /api/sessions/{id}/complete
-```
-
-The response fills the final screen with conversation strengths, one improvement, an example follow-up, and skill tags.
-
-## Important state in `App.tsx`
-
-| State | Meaning |
-| --- | --- |
-| `screen` | Which screen is visible: scenarios, opening, conversation, or recap. |
-| `selectedScenario` | The card the user chose before a session exists. |
-| `session` | Session id, character, scenario, and message history returned by the backend. |
-| `draft` | The current typed or transcribed response, before it is sent. |
-| `coachPrompt` / `skills` | The current guidance displayed under the conversation. |
-| `isLoading` | Prevents duplicate actions while an API request is in progress. |
-| `isRecording` | Changes the microphone control while the browser records audio. |
-
-## Adding a frontend feature
-
-For a new backend action, follow the existing pattern:
-
-1. Add a TypeScript interface for the request or response near the top of `App.tsx`.
-2. Call `request<T>()` from an event handler.
-3. Update the appropriate React state in the successful response.
-4. Render that state in the relevant screen.
-5. Add a test in [App.test.tsx](src/App.test.tsx), then run `npm test -- --watchAll=false`.
-
-The frontend must never contain a xAI key. It talks only to the Kora backend; the backend calls xAI.
+Nothing here. The catalogue is served by the backend, including the units nobody has written yet —
+the browser holds no list of titles to keep in step. Add it to
+`backend/src/main/kotlin/com/buddygo/gym/Catalog.kt`.

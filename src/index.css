@@ -22,7 +22,7 @@
   --shadow: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -1px rgba(0, 0, 0, .06);
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, .1), 0 10px 10px -5px rgba(0, 0, 0, .04);
 
-  /* Feedback states. The gym needs success/warn/danger surfaces that the
+  /* Feedback states. The practice room needs success/warn/danger surfaces that the
    * marketing site never had, so they are defined here rather than baked into
    * a rule — otherwise they survive the theme switch as light-mode colours. */
   /* The wash values below are tuned, not picked: --text-light on the
@@ -37,6 +37,15 @@
   --danger-bg: #fbe5dd;
   --danger-text: #8d3215;
   --stage: #1b1830;           /* letterbox behind a video */
+
+  /* Stand-in cover art, one pair per module, so a grid of unwritten units
+   * still reads as three distinct groups. Overridden per section in App.css. */
+  --cover-a: #4F46E5;
+  --cover-b: #FF17A6;
+  --cover-emotions-a: #0e7490;
+  --cover-emotions-b: #4F46E5;
+  --cover-heart-a: #b45309;
+  --cover-heart-b: #FF17A6;
 }
 
 [data-theme="dark"] {
@@ -61,6 +70,15 @@
   --danger-bg: #45211d;
   --danger-text: #fecaca;
   --stage: #0b1020;
+
+  /* Deeper in dark: the same hues at full strength glow against a near-black
+   * page and pull the eye off the titles. */
+  --cover-a: #3730a3;
+  --cover-b: #9d174d;
+  --cover-emotions-a: #155e75;
+  --cover-emotions-b: #3730a3;
+  --cover-heart-a: #92400e;
+  --cover-heart-b: #9d174d;
 }
 
 body {
