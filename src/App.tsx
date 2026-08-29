@@ -34,6 +34,13 @@ function App() {
   const { clearError } = practice;
   useEffect(() => clearError(), [location.pathname, clearError]);
 
+  // A route change is a new page, so it starts at the top. Without this the
+  // browser keeps the offset it had, and a tile clicked far down the catalogue
+  // lands you level with the composer — past the clip you came to watch.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [location.pathname]);
+
   // Page-level failures are rendered by the screen they belong to; everything
   // else sits above the page, where it does not take the page away.
   const banner = practice.error && !isPageLevel(practice.error) ? practice.error : null;

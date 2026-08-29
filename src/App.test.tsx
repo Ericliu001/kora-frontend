@@ -63,7 +63,7 @@ const CATALOG = [
     blurb: 'The moves a conversation is made of.',
     units: [
       BUILT_UNIT,
-      soon('ask-open-questions', 'skills', 'Ask questions that open conversations'),
+      soon('go-wide-first', 'skills', 'Go wide first'),
       soon('find-common-ground', 'skills', 'Find common ground'),
     ],
   },
