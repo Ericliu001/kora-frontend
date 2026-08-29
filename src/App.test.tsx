@@ -44,7 +44,7 @@ const BUILT_UNIT = {
   skill: 'Reflective listening',
   subSkillCount: 3,
   estimatedMinutes: 5,
-  coverUrl: '/units/listen-and-reflect/new-job-1.png',
+  coverUrl: 'https://media.onionloop.com/beats/new-job-1/5014424cade0/poster.jpg',
 };
 
 /** A unit that is on the map and nothing more. */
@@ -87,7 +87,7 @@ const FILMED_BEAT = {
   transcript:
     "I started a new job last week. Everyone's been really friendly, but there's so much to learn.",
   turnNumber: 1,
-  videoUrl: '/units/listen-and-reflect/new-job-1.mp4',
+  videoUrl: 'https://media.onionloop.com/beats/new-job-1/5014424cade0/720.mp4',
 };
 
 const WRITTEN_BEAT = {

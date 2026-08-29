@@ -196,15 +196,18 @@ button.unit-tile:hover:not(:disabled) {
   box-shadow: var(--shadow-lg);
 }
 
+/* Square, because the cover art is square: a 16/9 window would crop the top
+ * and bottom off every still. The stand-in keeps the same ratio so tiles in a
+ * row line up whether or not their footage exists yet. */
 .unit-cover {
   position: relative;
   display: block;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 1 / 1;
   overflow: hidden;
   background: var(--tint);
 }
 
-.unit-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.unit-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
 
 /* No footage yet. A gradient and the unit's own number tell tiles apart
  * without twenty placeholder files to delete later. */

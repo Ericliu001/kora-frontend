@@ -22,3 +22,6 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Local-only media, so `npm start` works before the CDN exists.
+# Production media is never served from here — see the Media section of README.md.
+/public/beats

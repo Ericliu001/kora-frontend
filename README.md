@@ -155,8 +155,92 @@ Two things are deliberately silent: a clip that will not load (the transcript ta
 exercise carries on — an alert about a handled failure is noise), and the server's own message on a
 5xx (it can be a stack detail; the fixed copy is what a person reads).
 
+## Media
+
+Video, posters and unit cover images are **not in this repository**. They live in a private
+Cloudflare R2 bucket, served by a small read-only Worker at `media.onionloop.com`, and the API sends
+absolute URLs to them:
+
+```jsonc
+// POST /api/practices
+"beat": {
+  "videoUrl":  "https://media.onionloop.com/beats/new-job-1/5014424cade0/720.mp4",
+  "posterUrl": "https://media.onionloop.com/beats/new-job-1/5014424cade0/poster.jpg",
+  "durationSeconds": 15
+}
+```
+
+The web app's entire involvement is putting those strings into `src` attributes:
+
+| Field | Rendered by |
+| --- | --- |
+| `beat.videoUrl`, `beat.posterUrl` | [BeatStage.tsx](src/components/BeatStage.tsx) |
+| `unit.coverUrl` | [UnitTile.tsx](src/components/UnitTile.tsx) |
+
+There is no media configuration here, and there should not be. `REACT_APP_API_BASE_URL` is the only
+environment variable the frontend has; the media host arrives inside the API response, so pointing
+the app at a staging backend automatically points it at that backend's bucket.
+
+That the bytes moved from `public/` to a bucket, and then from a public bucket to a Worker in front
+of a private one, changed nothing in this repository either time. Both times the whole delivery
+mechanism was swapped underneath a component that only ever knew a URL — which is the argument for
+keeping it that way.
+
+### Adding or replacing a clip
+
+**Nothing in this repository changes.** Publish the clip with `tools/publish-media.sh` (in the
+umbrella `kora` repo — `tools/README.md` there is the full guide) and paste the path it prints into
+the Kotlin unit. The next `/api/practices` response carries the new URL and the player picks it up.
+
+Two things follow from that, and both are worth not undoing:
+
+- **Never put unit media back under `public/`.** A root-absolute `/units/…` path resolves against
+  the dev server and works beautifully on your laptop, then 404s in production, where the frontend
+  is static files on Cloudflare Pages and has no such folder. What is left under `public/` is brand
+  assets and the CRA icons — see [Brand and theming](#brand-and-theming).
+- **No cache-busting, ever.** Media URLs contain the content hash of the file, so a reshoot is a new
+  URL. A `?v=2` query string on top of that would only defeat the caching.
+
+### Local development
+
+Once the media Worker is deployed, you need no bucket, no credential and no local files: the backend
+defaults `MEDIA_BASE_URL` to production and the assets are public and immutable, so `npm start`
+plays the same clips a learner sees.
+
+**Before it is deployed**, that default points at a hostname that does not resolve and every beat
+falls back to text. To work without it, put the published files under `public/` and point the
+backend at the dev server:
+
+```bash
+# once — the files come out of tools/publish-media.sh
+mkdir -p public/beats/new-job-1/5014424cade0
+cp ../tools/dist/beats/new-job-1/5014424cade0/{720.mp4,poster.jpg} $_
+
+# then run the backend against them
+cd ../backend && MEDIA_BASE_URL=http://localhost:3000 ./gradlew run
+```
+
+CRA serves `public/` at the site root, so those files land on exactly the paths the manifest asks
+for. `public/beats` is git-ignored, so this never reaches a build — which is the only thing that
+makes it acceptable. It is a bridge until the Worker is up, not a place for media to live; the
+warning above about `public/` still stands for anything that ships.
+
+Offline, they will not load — and that is fine, because it exercises the fallback:
+
+| Failure | What the learner gets |
+| --- | --- |
+| Clip will not load | `onError` fires, her line moves into the transcript, and the exercise carries on. **No error message** — the failure is already handled, and an alert about it would be noise. |
+| Cover will not load | `UnitTile` falls back to a CSS gradient tile. |
+
+Both paths are covered by tests, including *"a missing clip falls back to her words rather than
+blocking the exercise"*. They were the "you forgot to add the file" story when media lived in this
+repo; now they are the CDN-outage story, which is a better reason to keep them working.
+
+To see it deliberately: DevTools → Network → right-click any `media.onionloop.com` request → **Block
+request domain**, then reload and start a practice.
+
 ## Adding a unit
 
-Nothing here. The catalogue is served by the backend, including the units nobody has written yet —
-the browser holds no list of titles to keep in step. Add it to
-`backend/src/main/kotlin/com/buddygo/gym/Catalog.kt`.
+Nothing here either. The catalogue is served by the backend, including the units nobody has written
+yet — the browser holds no list of titles to keep in step. Add it to
+`backend/src/main/kotlin/com/buddygo/gym/Catalog.kt`, and its media with `tools/publish-media.sh`.
