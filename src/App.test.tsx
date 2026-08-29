@@ -527,7 +527,7 @@ test('a request that never leaves says so, in words', async () => {
   (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
   userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
 
-  expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't reach kora/i);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't reach the server/i);
   expect(document.body.textContent).not.toMatch(/failed to fetch/i);
 });
 
@@ -616,7 +616,7 @@ test('a catalogue that will not load replaces the grid, and can be retried', asy
   (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
   renderApp();
 
-  expect(await screen.findByText(/couldn't reach kora/i)).toBeInTheDocument();
+  expect(await screen.findByText(/couldn't reach the server/i)).toBeInTheDocument();
   expect(screen.queryByRole('heading', { name: 'Skills' })).not.toBeInTheDocument();
 
   userEvent.click(screen.getByRole('button', { name: /try again/i }));

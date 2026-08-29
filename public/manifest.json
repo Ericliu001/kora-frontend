@@ -1,6 +1,6 @@
 {
-  "short_name": "Kora",
-  "name": "Kora | Onion Loop",
+  "short_name": "Onion Loop",
+  "name": "Onion Loop",
   "description": "A training ground for talking to people. One unit at a time.",
   "icons": [
     { "src": "favicon.ico", "sizes": "64x64 48x48 32x32 24x24 16x16", "type": "image/x-icon" },

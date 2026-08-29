@@ -1,4 +1,4 @@
-/* Kora, wearing Onion Loop.
+/* The Onion Loop app stylesheet.
  *
  * Every colour here comes from a token in index.css. That is the whole trick
  * behind dark mode: no rule below names a hex, so flipping data-theme on <html>
@@ -70,16 +70,6 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   height: 32px;
   border-radius: 8px;
   object-fit: contain;
-}
-
-.product-tag {
-  padding: 4px 10px;
-  border-radius: 20px;
-  background: var(--tint);
-  color: var(--primary-color);
-  font-size: 11px;
-  font-weight: 800;
-  letter-spacing: 1px;
 }
 
 .theme-toggle {
@@ -701,7 +691,6 @@ button.unit-tile:hover:not(:disabled) {
 @media (max-width: 700px) {
   .site-nav { padding: 1rem 20px; }
   .brand { font-size: 1.15rem; }
-  .product-tag { display: none; }
   .theme-toggle { padding: .5rem; border: 0; }
 
   .hero { padding: 3.5rem 1.5rem; }

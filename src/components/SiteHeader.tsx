@@ -3,8 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTheme } from '../hooks/useTheme';
 
 /**
- * Onion Loop chrome. The wordmark is the company, the pill beside it is which
- * product you are standing in — Kora is one surface of several.
+ * Onion Loop chrome. The wordmark is the company and, for now, the only public
+ * name — so there is no product pill beside it.
  *
  * No hamburger: there is one link here. A menu button that opens a list of one
  * is furniture, not navigation.
@@ -19,7 +19,6 @@ export default function SiteHeader() {
           <img src={`${process.env.PUBLIC_URL}/brand/logo.png`} alt="" className="logo-icon" />
           Onion Loop
         </Link>
-        <span className="product-tag">KORA</span>
         <button
           className="theme-toggle"
           onClick={toggleTheme}

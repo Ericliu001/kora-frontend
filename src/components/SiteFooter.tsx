@@ -27,7 +27,7 @@ export default function SiteFooter() {
         </div>
 
         <div className="footer-section">
-          <h3>Kora</h3>
+          <h3>Course</h3>
           <ul>
             <li><Link to="/">All units</Link></li>
             <li><a href={`${SITE}/services.html`}>Why we built it</a></li>

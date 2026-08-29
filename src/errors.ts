@@ -56,7 +56,7 @@ export function toAppError(reason: unknown, fallback = 'Something went wrong.'):
         }
       : {
           kind: 'offline',
-          message: "We couldn't reach Kora. Check your connection and try again.",
+          message: "We couldn't reach the server. Check your connection and try again.",
           detail: reason.detail,
         };
   }

@@ -1,6 +1,6 @@
 /* Onion Loop design tokens.
  *
- * Ported from onion-loop-website/styles.css so Kora and the marketing site
+ * Ported from onion-loop-website/styles.css so this app and the marketing site
  * speak the same visual language. Everything downstream — App.css, the chrome
  * components — reads from these and nothing else, which is what lets the whole
  * app flip themes by setting one attribute on <html>.
