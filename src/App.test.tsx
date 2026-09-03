@@ -13,47 +13,51 @@ const renderApp = (path = '/') =>
     </MemoryRouter>,
   );
 
-// Fixtures mirroring what the Ktor backend sends.
-const TEACHES = [
-  {
-    skill: 'FACTS',
-    label: 'Reflect the facts',
-    description: 'Say back what happened.',
-    purpose: 'Their words back at them proves you were recording.',
-  },
-  {
-    skill: 'FEELING',
-    label: 'Recognise the emotion',
-    description: 'Name how they feel.',
-    purpose: 'This is what makes someone feel heard.',
-  },
-  {
-    skill: 'INVITATION',
-    label: 'Invite them to continue',
-    description: 'Leave an opening.',
-    purpose: 'It hands the conversation back.',
-  },
-];
+// Fixtures mirroring what the Ktor backend sends, taken from the authored
+// dialog in data/dialogs/start-a-conversation.json.
 
-const BUILT_UNIT = {
-  id: 'listen-and-reflect',
-  moduleId: 'skills',
-  title: "Show that you're listening",
-  blurb: 'Practise paraphrasing, noticing emotions, and holding advice back.',
-  playable: true,
-  skill: 'Reflective listening',
-  subSkillCount: 3,
-  estimatedMinutes: 5,
-  coverUrl: 'https://media.onionloop.com/beats/new-job-1/5014424cade0/poster.jpg',
+/** One move, belonging to one turn — not one trio belonging to the unit. */
+const COACHING = {
+  skillKey: 'INTRODUCE_AND_OPEN',
+  label: 'Introduce and open',
+  instruction: 'Greet Tom, introduce yourself by name, then ask how his day is going.',
+  purpose: 'Introducing yourself and asking an easy question turns the meeting into a conversation.',
+  example: "Hello, Tom. I'm Alex. How's your day going?",
 };
 
-/** A unit that is on the map and nothing more. */
-const soon = (id: string, moduleId: string, title: string) => ({
+const NEXT_COACHING = {
+  skillKey: 'ANSWER_WITH_A_PLAN',
+  label: 'Answer with a plan',
+  instruction: 'Say what you are doing later, then ask Tom the same thing back.',
+  purpose: 'A concrete answer gives the other person something to ask about.',
+  example: "I'm cooking tonight, nothing exciting. What about you?",
+};
+
+const BUILT_UNIT = {
+  id: 'start-a-conversation',
+  moduleId: 'skills',
+  title: 'Start a conversation',
+  blurb: 'Greet someone and ask one easy question, then leave room for a real answer.',
+  playable: true,
+  skill: 'Opening a conversation',
+  estimatedMinutes: 4,
+  turnCount: 3,
+};
+
+/**
+ * A unit that is on the map and nothing more.
+ *
+ * It still says what it teaches and how long it takes: units.csv knows both
+ * before anybody writes a line of dialog.
+ */
+const preview = (id: string, moduleId: string, title: string, skill: string) => ({
   id,
   moduleId,
   title,
   blurb: `${title} — one day.`,
   playable: false,
+  skill,
+  estimatedMinutes: 5,
 });
 
 const CATALOG = [
@@ -63,76 +67,113 @@ const CATALOG = [
     blurb: 'The moves a conversation is made of.',
     units: [
       BUILT_UNIT,
-      soon('go-wide-first', 'skills', 'Go wide first'),
-      soon('find-common-ground', 'skills', 'Find common ground'),
+      preview('then-go-deep', 'skills', 'Then go deep', 'Follow-up questions'),
+      preview('find-common-ground', 'skills', 'Find common ground', 'Finding common ground'),
     ],
   },
   {
     id: 'emotions',
     title: 'Emotions',
     blurb: 'Noticing what you and other people feel.',
-    units: [soon('sit-with-discomfort', 'emotions', 'Sit with discomfort')],
+    units: [preview('sit-with-discomfort', 'emotions', 'Sit with discomfort', 'Staying present')],
   },
   {
     id: 'heart',
     title: 'Heart',
     blurb: 'Attention, honesty and care.',
-    units: [soon('let-yourself-be-known', 'heart', 'Let yourself be known')],
+    units: [preview('let-yourself-be-known', 'heart', 'Let yourself be known', 'Being known')],
   },
 ];
 
-const FILMED_BEAT = {
-  id: 'new-job-1',
-  speaker: 'Nadia',
-  transcript:
-    "I started a new job last week. Everyone's been really friendly, but there's so much to learn.",
+const TURN_1 = {
+  id: 'starting-chat-1',
+  speaker: 'Tom',
   turnNumber: 1,
-  videoUrl: 'https://media.onionloop.com/beats/new-job-1/5014424cade0/720.mp4',
+  line: "Hi, I don't think we've properly met. I'm Tom. Nice to meet you!",
+  coaching: COACHING,
 };
 
-const WRITTEN_BEAT = {
-  id: 'new-job-2b',
-  speaker: 'Nadia',
-  transcript: 'Exactly. And I keep worrying I will ask something I should already know.',
+/** A later turn arrives with the character's reaction in front of its line. */
+const TURN_2 = {
+  id: 'starting-chat-2',
+  speaker: 'Tom',
   turnNumber: 2,
+  bridge: 'Thanks for asking.',
+  line: "My day's been fairly quiet, mostly emails. What are you up to later?",
+  coaching: NEXT_COACHING,
 };
 
 const PRACTICE = {
   id: 'p1',
-  unitId: 'listen-and-reflect',
+  unitId: 'start-a-conversation',
   unitTitle: BUILT_UNIT.title,
-  teaches: TEACHES,
-  beat: FILMED_BEAT,
+  userGoal: 'Say hello, answer briefly and ask an easy everyday question.',
+  turnCount: 3,
+  turn: TURN_1,
 };
 
 const REFLECTION = {
   level: 'BETTER',
-  checks: {
-    facts: { captured: true, evidence: 'you reflected that she started a new job' },
-    feeling: { captured: true, evidence: 'you named that she feels overwhelmed' },
-    invitation: { captured: false, missed: 'an invitation to keep going' },
+  criteria: [
+    { id: 'greeting', label: 'You greeted him', captured: true, evidence: 'you opened with hello' },
+    {
+      id: 'introduce_self',
+      label: 'You introduced yourself',
+      captured: true,
+      evidence: 'you gave him your name',
+    },
+    {
+      id: 'ask_about_day',
+      label: 'You asked about his day',
+      captured: false,
+      guidance: 'Ask Tom how his day is going.',
+    },
+  ],
+  feedback: 'You greeted him and gave your name. Now try handing the question back.',
+  strongerReply: {
+    text: "Hi Tom, I'm Alex. Good to meet you — how's your day been?",
+    source: 'REWRITTEN',
   },
-  feedback: 'You caught both what happened and how she feels. Now try leaving her an opening.',
-  exemplar: { tier: 'BEST', text: 'Starting somewhere new can be a lot. What has been hardest?' },
-  attemptsOnBeat: 1,
+  attemptsOnTurn: 1,
   retry: false,
-  nextBeat: WRITTEN_BEAT,
+  nextTurn: TURN_2,
   complete: false,
 };
 
-/** A first attempt that lands the facts only, so the learner is sent back. */
+/** A reply with nothing missing. Every check landed, so the level is BEST. */
+const BEST_REFLECTION = {
+  ...REFLECTION,
+  level: 'BEST',
+  criteria: REFLECTION.criteria.map((criterion) => ({
+    ...criterion,
+    captured: true,
+    evidence: criterion.evidence ?? 'you did this',
+    guidance: undefined,
+  })),
+  feedback: 'You did all three parts of introduce and open.',
+};
+
+/** A first attempt that lands one check only, so the learner is sent back. */
 const RETRY_REFLECTION = {
   ...REFLECTION,
   level: 'DEVELOPING',
-  checks: {
-    facts: { captured: true, evidence: 'you reflected that she started a new job' },
-    feeling: { captured: false, missed: 'overwhelmed' },
-    invitation: { captured: false, missed: 'an invitation to keep going' },
-  },
-  exemplar: { tier: 'BETTER', text: 'It sounds like that has left you overwhelmed.' },
-  attemptsOnBeat: 1,
+  criteria: [
+    { id: 'greeting', label: 'You greeted him', captured: true, evidence: 'you opened with hello' },
+    {
+      id: 'introduce_self',
+      label: 'You introduced yourself',
+      captured: false,
+      guidance: 'Introduce yourself by name.',
+    },
+    {
+      id: 'ask_about_day',
+      label: 'You asked about his day',
+      captured: false,
+      guidance: 'Ask Tom how his day is going.',
+    },
+  ],
   retry: true,
-  nextBeat: undefined,
+  nextTurn: undefined,
 };
 
 function mockBackend(overrides: Record<string, unknown> = {}) {
@@ -157,20 +198,21 @@ function mockBackend(overrides: Record<string, unknown> = {}) {
   });
 }
 
-afterEach(() => jest.restoreAllMocks());
+/** A response the server never meant a person to read. */
+const failWith = (status: number, body: Record<string, string>) =>
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: false,
+    status,
+    json: () => Promise.resolve(body),
+  } as Response);
 
-/** jsdom never fires `ended` on its own — the clip has to be told it finished. */
-function fireOnVideo(event: 'ended' | 'error') {
-  const video = document.querySelector('video');
-  if (!video) throw new Error('no video on the stage');
-  video.dispatchEvent(new Event(event));
-}
+afterEach(() => jest.restoreAllMocks());
 
 // By role, not by label: the label is the guidance now, and it changes between
 // a first attempt and a retry. The textarea is the only textbox on the page.
 const composer = () => screen.findByRole('textbox');
 
-const tile = () => screen.findByRole('button', { name: /show that you're listening/i });
+const tile = () => screen.findByRole('button', { name: /start a conversation/i });
 
 /** One click. There is nothing between the grid and the practice room. */
 async function reachThePracticeRoom() {
@@ -178,9 +220,9 @@ async function reachThePracticeRoom() {
   await composer();
 }
 
-async function reflectWith(text: string) {
+async function replyWith(text: string) {
   userEvent.type(await composer(), text);
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
 }
 
 // ---------------------------------------------------------------------------
@@ -208,28 +250,29 @@ test('a unit nobody has written yet is on the map, but is not a door', async () 
   // order, and being read is the whole job of a roadmap.
   expect(screen.getByText('Find common ground')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /find common ground/i })).not.toBeInTheDocument();
-  expect(screen.getAllByText(/coming soon/i).length).toBeGreaterThan(0);
+  expect(screen.getAllByText(/preview/i).length).toBeGreaterThan(0);
 });
 
-test('a unit with no cover art still gets a cover', async () => {
+test('a preview says what it will teach and how long it takes', async () => {
   mockBackend();
   const { container } = renderApp();
   await tile();
 
-  // One real still, four stand-ins.
-  expect(container.querySelectorAll('.unit-cover img')).toHaveLength(1);
-  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(4);
+  // A roadmap that will not say what is on it is not much of a roadmap, and
+  // the catalogue knows both facts about every unit before anyone writes one.
+  const locked = Array.from(container.querySelectorAll('.unit-tile.is-locked')).find((tile) =>
+    tile.textContent?.includes('Find common ground'),
+  );
+  expect(locked).toHaveTextContent('Finding common ground');
+  expect(locked).toHaveTextContent(/about 5 min/i);
 });
 
-test('cover art that will not load falls back rather than showing a broken image', async () => {
+test('every tile gets a cover, because no unit has been filmed', async () => {
   mockBackend();
   const { container } = renderApp();
   await tile();
 
-  const image = container.querySelector('.unit-cover img') as HTMLImageElement;
-  image.dispatchEvent(new Event('error'));
-
-  await waitFor(() => expect(container.querySelectorAll('.unit-cover img')).toHaveLength(0));
+  expect(container.querySelectorAll('.unit-cover img')).toHaveLength(0);
   expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(5);
 });
 
@@ -246,7 +289,7 @@ test('clicking a unit starts training, with nothing in between', async () => {
   const [, options] = (global.fetch as jest.Mock).mock.calls.find(([url]: [string]) =>
     String(url).endsWith('/practices'),
   );
-  expect(JSON.parse(options.body)).toEqual({ unitId: 'listen-and-reflect' });
+  expect(JSON.parse(options.body)).toEqual({ unitId: 'start-a-conversation' });
 });
 
 test('the tile says it is starting while the server is thinking', async () => {
@@ -294,7 +337,7 @@ test('a start that fails leaves you on the home page, beside the tile you clicke
 
 test('a pasted unit link starts training with no click', async () => {
   mockBackend();
-  renderApp('/units/listen-and-reflect');
+  renderApp('/units/start-a-conversation');
   expect(await composer()).toBeInTheDocument();
 });
 
@@ -311,7 +354,7 @@ test('a link to an unwritten unit says so, and asks the server nothing', async (
 
 test('a link to a unit that does not exist is answered once, not forever', async () => {
   mockBackend();
-  (global.fetch as jest.Mock).mockImplementationOnce((input) =>
+  (global.fetch as jest.Mock).mockImplementationOnce(() =>
     Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CATALOG) } as Response),
   );
   failWith(404, { error: "We couldn't find that unit.", code: 'UNKNOWN_UNIT' });
@@ -329,136 +372,165 @@ test('a link to a unit that does not exist is answered once, not forever', async
 
 test('a link from before units had their own name still works', async () => {
   mockBackend();
-  renderApp('/modules/listen-and-reflect');
+  renderApp('/modules/start-a-conversation');
   expect(await composer()).toBeInTheDocument();
 });
 
-test('the learner can reply before the clip has finished', async () => {
+// ---------------------------------------------------------------------------
+// The conversation
+// ---------------------------------------------------------------------------
+
+test("the character's line is in the conversation before the learner replies", async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
 
-  // Nothing is blocked while she is still talking — only signposted.
+  // Nothing is filmed, so there is no clip to wait through and nothing to
+  // signpost: the words are simply there, once, ready to answer.
+  expect(await screen.findByText(TURN_1.line)).toBeInTheDocument();
+  expect(document.querySelector('video')).toBeNull();
+  expect(screen.queryByText(/is still talking/i)).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
-  expect(screen.getByText(/nadia is still talking/i)).toBeInTheDocument();
-
-  fireOnVideo('ended');
-
-  await waitFor(() =>
-    expect(screen.queryByText(/nadia is still talking/i)).not.toBeInTheDocument(),
-  );
 });
 
-test('taking your turn stops her talking', async () => {
+test("the character's reaction is part of their next line, not a turn of its own", async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
 
-  const video = document.querySelector('video')!;
-  Object.defineProperty(video, 'paused', { value: false, configurable: true });
-  const pause = jest.spyOn(video, 'pause').mockImplementation(() => undefined);
+  await replyWith('Hi Tom, I am Alex.');
+  userEvent.click(await screen.findByRole('button', { name: /continue/i }));
 
-  await reflectWith('That sounds like a lot.');
-
-  // Otherwise she keeps talking over the feedback the learner is trying to read.
-  expect(pause).toHaveBeenCalled();
+  // The bridge answers what the learner actually said; the line after it is
+  // authored. They arrive apart and are spoken as one turn.
+  const spoken = `${TURN_2.bridge} ${TURN_2.line}`;
+  expect(await screen.findByText(spoken)).toBeInTheDocument();
 });
 
-test('her filmed words stay out of the transcript until the learner has replied', async () => {
-  mockBackend();
+test('a retry does not log the line to the transcript twice', async () => {
+  mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  // The clip is the presentation; showing the text too would let them read
-  // instead of listen.
-  expect(screen.queryByText(FILMED_BEAT.transcript)).not.toBeInTheDocument();
-
-  await reflectWith('That sounds like a lot.');
-
-  expect(await screen.findByText(FILMED_BEAT.transcript)).toBeInTheDocument();
-});
-
-test('a retry does not log her line to the transcript twice', async () => {
-  mockBackend({
-    '/practices/p1/reflections': { ...REFLECTION, retry: true, nextBeat: undefined, level: 'DEVELOPING' },
-  });
-  renderApp();
-  await reachThePracticeRoom();
-  fireOnVideo('ended');
-
-  await reflectWith('You started a new job.');
+  await replyWith('Hi.');
   userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
-  await reflectWith('You started a new job and it sounds like a lot.');
+  await replyWith('Hi Tom, I am Alex.');
 
-  await waitFor(() => expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1));
+  await waitFor(() => expect(screen.getAllByText(TURN_1.line)).toHaveLength(1));
 });
 
-test('submitting a reflection shows all three checks, the feedback and a stronger reply', async () => {
+test('submitting a reply shows all three checks, the feedback and a stronger reply', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  await reflectWith('That sounds like a lot to take in.');
+  await replyWith('Hi Tom, I am Alex.');
 
   // Wait for the real feedback — the pending card renders a scorecard too.
   await screen.findByText(REFLECTION.feedback);
 
-  const scorecard = screen.getByRole('list', { name: /your reflection/i });
+  const scorecard = screen.getByRole('list', { name: /your reply/i });
   const items = within(scorecard).getAllByRole('listitem');
   expect(items).toHaveLength(3);
 
-  expect(items[0]).toHaveTextContent('The facts');
-  expect(items[0]).toHaveTextContent(REFLECTION.checks.facts.evidence);
+  expect(items[0]).toHaveTextContent('You greeted him');
+  expect(items[0]).toHaveTextContent('you opened with hello');
   expect(items[0]).toHaveClass('captured');
 
-  expect(items[2]).toHaveTextContent('The invitation');
-  expect(items[2]).toHaveTextContent('an invitation to keep going');
+  expect(items[2]).toHaveTextContent('You asked about his day');
+  expect(items[2]).toHaveTextContent('Ask Tom how his day is going.');
   expect(items[2]).toHaveClass('missed');
 
-  expect(screen.getByText(`“${REFLECTION.exemplar.text}”`)).toBeInTheDocument();
-  expect(screen.getByText('That sounds like a lot to take in.')).toBeInTheDocument();
+  expect(screen.getByText('Hi Tom, I am Alex.')).toBeInTheDocument();
 });
 
-test('continuing moves to the written beat, which needs no clip', async () => {
+/**
+ * The point of the whole feedback panel. A canned model answer is easy to
+ * admire and impossible to learn from, because it is about somebody else's
+ * life; a rewrite of your own reply is one you could actually have said.
+ */
+test('the stronger reply is the learner’s own words, and says so', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  await reflectWith('A lot to take in.');
-  userEvent.click(await screen.findByRole('button', { name: /continue/i }));
+  await replyWith('Hi Tom, I am Alex.');
+  await screen.findByText(REFLECTION.feedback);
 
-  expect(await screen.findByText(WRITTEN_BEAT.transcript)).toBeInTheDocument();
-  expect(document.querySelector('video')).toBeNull();
-  // Nothing to wait for, so the learner can answer straight away.
-  expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
+  expect(screen.getByText(`“${REFLECTION.strongerReply.text}”`)).toBeInTheDocument();
+  expect(screen.getByText(/a stronger version of your reply/i)).toBeInTheDocument();
 });
 
-test('a written beat shows her line once, not on the stage and in the transcript', async () => {
+test('an authored example is never passed off as a rewrite of what you said', async () => {
   mockBackend({
-    '/practices/p1/reflections': { ...REFLECTION, nextBeat: undefined, complete: false, retry: true },
+    '/practices/p1/reflections': {
+      ...REFLECTION,
+      strongerReply: { text: COACHING.example, source: 'EXAMPLE' },
+    },
   });
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('error');
 
-  // Her words are in the conversation exactly once before the reply...
-  await waitFor(() => expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1));
-
-  await reflectWith('That sounds like a lot.');
+  await replyWith('Hi Tom, I am Alex.');
   await screen.findByText(REFLECTION.feedback);
 
-  // ...and still exactly once while the feedback is on screen.
-  expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1);
+  expect(screen.queryByText(/a stronger version of your reply/i)).not.toBeInTheDocument();
+  expect(screen.getAllByText(/one way to say it/i).length).toBeGreaterThan(0);
+});
+
+/**
+ * A rewrite of a reply that was already right says it fell short when nothing
+ * was missing. The strongest version of a strong reply is the one they wrote.
+ */
+test('a reply that lands all three is shown its own words, not a better version', async () => {
+  mockBackend({ '/practices/p1/reflections': BEST_REFLECTION });
+  renderApp();
+  await reachThePracticeRoom();
+
+  await replyWith('Hi Tom, I am Alex. How has your day been?');
+  await screen.findByText(BEST_REFLECTION.feedback);
+
+  expect(screen.getByText(/this is the move/i)).toBeInTheDocument();
+  expect(screen.getByText('“Hi Tom, I am Alex. How has your day been?”')).toBeInTheDocument();
+  expect(screen.queryByText(/a stronger version of your reply/i)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(`“${REFLECTION.strongerReply.text}”`),
+  ).not.toBeInTheDocument();
+});
+
+test('a reply that missed something still gets the rewrite', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  await replyWith('Hi Tom, I am Alex.');
+  await screen.findByText(REFLECTION.feedback);
+
+  expect(screen.getByText(/a stronger version of your reply/i)).toBeInTheDocument();
+  expect(screen.queryByText(/this is the move/i)).not.toBeInTheDocument();
+});
+
+/**
+ * The two layers of the practice room must not be told apart by reading them.
+ * A line someone said is a bubble; everything the app says about it sits on
+ * the coaching surface.
+ */
+test('what the app says is on a different surface from what anybody said', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  const line = await screen.findByText(TURN_1.line);
+  expect(line.closest('.utterance')).toBeInTheDocument();
+  expect(line.closest('.coach-surface')).toBeNull();
+
+  expect(screen.getByText(/your turn/i).closest('.coach-surface')).toBeInTheDocument();
 });
 
 test('the reply lands immediately and a pending card holds the place', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
   // Hold the assessment open so the waiting state is observable.
   let release: () => void = () => undefined;
@@ -469,48 +541,40 @@ test('the reply lands immediately and a pending card holds the place', async () 
       }),
   );
 
-  await reflectWith('That sounds like a lot to take in.');
+  await replyWith('Hi Tom, I am Alex.');
 
   // The reply is already in the conversation, and the composer has stood down.
-  expect(await screen.findByText('That sounds like a lot to take in.')).toBeInTheDocument();
-  expect(screen.getByText(/listening back over what you said/i)).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /reflect back/i })).not.toBeInTheDocument();
+  expect(await screen.findByText('Hi Tom, I am Alex.')).toBeInTheDocument();
+  expect(screen.getByText(/reading your reply back/i)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /send reply/i })).not.toBeInTheDocument();
+  // Naming the move again while they wait is one more repetition of it.
+  expect(screen.getByText(/checking: introduce and open/i)).toBeInTheDocument();
 
   release();
 
   expect(await screen.findByText(REFLECTION.feedback)).toBeInTheDocument();
-  expect(screen.queryByText(/listening back over what you said/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/reading your reply back/i)).not.toBeInTheDocument();
 });
 
-/** A response the server never meant a person to read. */
-const failWith = (status: number, body: Record<string, string>) =>
-  (global.fetch as jest.Mock).mockResolvedValueOnce({
-    ok: false,
-    status,
-    json: () => Promise.resolve(body),
-  } as Response);
-
-test('a failed reflection rolls the conversation back, draft included', async () => {
+test('a failed reply rolls the conversation back, draft included', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  userEvent.type(await composer(), 'Sounds like a lot.');
+  userEvent.type(await composer(), 'Hi Tom.');
 
-  failWith(502, { error: 'grok call failed: Read timed out', code: 'UPSTREAM_FAILED' });
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  failWith(502, { error: 'model call failed: Read timed out', code: 'UPSTREAM_FAILED' });
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
 
   // Our fault, so our words: the server's own message at this status can be a
   // stack detail, and this is the string a person actually reads.
   const banner = await screen.findByRole('alert');
   expect(banner).toHaveTextContent(/something went wrong on our side/i);
   expect(banner).not.toHaveTextContent(/read timed out/i);
-  expect(await composer()).toHaveValue('Sounds like a lot.');
+  expect(await composer()).toHaveValue('Hi Tom.');
 
-  // The optimistic turn is gone again — hers and the learner's both.
-  expect(screen.queryByText('Sounds like a lot.', { selector: 'p' })).not.toBeInTheDocument();
-  expect(screen.queryByText(FILMED_BEAT.transcript)).not.toBeInTheDocument();
+  // The optimistic turn is gone again.
+  expect(screen.queryByText('Hi Tom.', { selector: 'p' })).not.toBeInTheDocument();
 
   // The draft is already back, so trying again is one click.
   userEvent.click(within(banner).getByRole('button', { name: /try again/i }));
@@ -521,11 +585,10 @@ test('a request that never leaves says so, in words', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  userEvent.type(await composer(), 'Sounds like a lot.');
+  userEvent.type(await composer(), 'Hi Tom.');
   (global.fetch as jest.Mock).mockRejectedValueOnce(new TypeError('Failed to fetch'));
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
 
   expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't reach the server/i);
   expect(document.body.textContent).not.toMatch(/failed to fetch/i);
@@ -535,16 +598,15 @@ test('a reply the server can read and declines is answered next to the box', asy
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
   const box = await composer();
   userEvent.type(box, 'hm');
-  failWith(400, { error: 'Say a little something back to her.', code: 'REFLECTION_EMPTY' });
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  failWith(400, { error: 'Say a little something back.', code: 'REFLECTION_EMPTY' });
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
 
   // Its words, verbatim — the server knows what was wrong with the request and
   // we do not — and beside the box, because editing is the retry.
-  expect(await screen.findByRole('alert')).toHaveTextContent('Say a little something back to her.');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Say a little something back.');
   expect(await composer()).toBeInvalid();
 });
 
@@ -552,14 +614,13 @@ test('editing clears the complaint about what was typed', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
   userEvent.type(await composer(), 'hm');
-  failWith(400, { error: 'Say a little something back to her.', code: 'REFLECTION_EMPTY' });
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  failWith(400, { error: 'Say a little something back.', code: 'REFLECTION_EMPTY' });
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
   await screen.findByRole('alert');
 
-  userEvent.type(await composer(), ' that sounds like a lot');
+  userEvent.type(await composer(), ' hello Tom');
   await waitFor(() => expect(screen.queryByRole('alert')).not.toBeInTheDocument());
 });
 
@@ -567,11 +628,10 @@ test('a banner can be dismissed', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  userEvent.type(await composer(), 'Sounds like a lot.');
+  userEvent.type(await composer(), 'Hi Tom.');
   failWith(500, { error: 'boom', code: 'INTERNAL' });
-  userEvent.click(screen.getByRole('button', { name: /reflect back/i }));
+  userEvent.click(screen.getByRole('button', { name: /send reply/i }));
 
   const banner = await screen.findByRole('alert');
   userEvent.click(within(banner).getByRole('button', { name: /dismiss/i }));
@@ -623,85 +683,86 @@ test('a catalogue that will not load replaces the grid, and can be retried', asy
   expect(await tile()).toBeInTheDocument();
 });
 
-test('the composer names the three sub-skills, and why each one works', async () => {
+// ---------------------------------------------------------------------------
+// The coaching
+// ---------------------------------------------------------------------------
+
+test('the composer names the one move being practised, and why it works', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
 
   const guide = screen.getByRole('list', { name: /what to aim for/i });
   const rows = within(guide).getAllByRole('listitem');
-  expect(rows).toHaveLength(3);
+  expect(rows).toHaveLength(1);
 
-  // The instruction and the reason for it, in scorecard order.
-  expect(rows[0]).toHaveTextContent('Reflect the facts');
-  expect(rows[0]).toHaveTextContent('Their words back at them proves you were recording.');
-  expect(rows[1]).toHaveTextContent('Recognise the emotion');
-  expect(rows[2]).toHaveTextContent('It hands the conversation back.');
+  expect(rows[0]).toHaveTextContent(COACHING.label);
+  expect(rows[0]).toHaveTextContent(COACHING.instruction);
+  expect(rows[0]).toHaveTextContent(COACHING.purpose);
+  // The example is shown before the reply on purpose: the exercise is saying
+  // this with the facts of your own life, not guessing what to say.
+  expect(screen.getByText(`“${COACHING.example}”`)).toBeInTheDocument();
+});
+
+test('each turn asks for its own move, not the same one three times', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  await replyWith('Hi Tom, I am Alex.');
+  userEvent.click(await screen.findByRole('button', { name: /continue/i }));
+
+  expect(await screen.findByText(NEXT_COACHING.instruction)).toBeInTheDocument();
+  expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
 });
 
 test('a retry keeps what landed and asks for what is still open', async () => {
   mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  await reflectWith('You started a new job.');
+  await replyWith('Hi.');
   userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
 
-  // The prompt now names the two moves that are missing, and only those.
-  expect(
-    await screen.findByText(/try again — this time, name how they feel and leave them an opening\./i),
-  ).toBeInTheDocument();
+  expect(await screen.findByText(/2 of the three is still open/i)).toBeInTheDocument();
   expect(screen.getByText(/attempt 2 of 3/i)).toBeInTheDocument();
 
-  const rows = within(screen.getByRole('list', { name: /what to aim for/i })).getAllByRole(
-    'listitem',
-  );
-  expect(rows[0]).toHaveClass('captured');
-  expect(rows[1]).toHaveClass('open');
-  expect(rows[2]).toHaveClass('open');
+  // The two that are open are named; the one that landed is not repeated back.
+  const chips = document.querySelectorAll('.guide-chip.open');
+  expect(chips).toHaveLength(2);
+  expect(chips[0]).toHaveTextContent('You introduced yourself');
 });
 
+/**
+ * Where the wire decision is encoded.
+ *
+ * The labels were earned — the learner read them on the scorecard a moment
+ * ago, so repeating them is not a leak. What the author wrote about *what was
+ * missing* is a different thing, and it must not sit above an empty box.
+ */
 test('the retry guidance points at the missing move without giving the answer', async () => {
   mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  await reflectWith('You started a new job.');
+  await replyWith('Hi.');
   userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
   await screen.findByRole('list', { name: /what to aim for/i });
 
-  // The rubric's own words live in `missed` and `evidence`. They belong in the
-  // scorecard after an attempt, never in front of the next one — otherwise the
-  // second try is copying, not reflecting.
   const composerPanel = document.querySelector('.composer')!;
-  expect(composerPanel).not.toHaveTextContent('overwhelmed');
-  expect(composerPanel).not.toHaveTextContent('an invitation to keep going');
-  expect(composerPanel).not.toHaveTextContent(RETRY_REFLECTION.checks.facts.evidence);
+  expect(composerPanel).not.toHaveTextContent('Introduce yourself by name.');
+  expect(composerPanel).not.toHaveTextContent('Ask Tom how his day is going.');
+  expect(composerPanel).not.toHaveTextContent('you opened with hello');
 });
 
-test('moving to the next beat clears the retry guidance', async () => {
+test('moving to the next turn clears the retry guidance', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
-  fireOnVideo('ended');
 
-  await reflectWith('A lot to take in.');
+  await replyWith('Hi Tom, I am Alex.');
   userEvent.click(await screen.findByRole('button', { name: /continue/i }));
 
-  expect(await screen.findByText(/what would you say back to nadia\?/i)).toBeInTheDocument();
+  expect(await screen.findByText(/what would you say back to tom\?/i)).toBeInTheDocument();
   expect(screen.queryByText(/attempt 2 of 3/i)).not.toBeInTheDocument();
-});
-
-test('a missing clip falls back to her words rather than blocking the exercise', async () => {
-  mockBackend();
-  renderApp();
-  await reachThePracticeRoom();
-
-  fireOnVideo('error');
-
-  // Her words take the stage, exactly once, and the exercise carries on.
-  await waitFor(() => expect(screen.getAllByText(FILMED_BEAT.transcript)).toHaveLength(1));
-  expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
 });

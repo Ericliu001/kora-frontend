@@ -1,28 +1,23 @@
 import React from 'react';
 import { VOICE_UNSUPPORTED } from '../errors';
 import { Practising } from '../hooks/usePractice';
-import {
-  checkBySkill,
-  joinPhrases,
-  MAX_ATTEMPTS_PER_BEAT,
-  RETRY_PROMPT,
-  SUB_SKILL_ORDER,
-} from '../types';
-import ComposerGuide from './ComposerGuide';
+import { MAX_ATTEMPTS_PER_TURN } from '../types';
+import CoachingCard from './CoachingCard';
 import ErrorNotice from './ErrorNotice';
 
 /**
  * Where the learner takes their turn.
  *
  * The label is the teaching. On a first attempt it asks the open question; on a
- * retry it names the moves still missing — by move, never by content, so the
- * answer is still theirs to find.
+ * retry it says how much is still open, and the chips in the coaching card say
+ * which parts — by the names the learner already read on the scorecard, never
+ * by the words that were missing.
  */
 export default function Composer({ practice }: { practice: Practising }) {
   const {
-    beat,
-    teaches,
-    carriedChecks,
+    turn,
+    coaching,
+    carriedCriteria,
     attemptNumber,
     draft,
     setDraft,
@@ -36,34 +31,30 @@ export default function Composer({ practice }: { practice: Practising }) {
     submitReflection,
   } = practice;
 
-  if (!beat) return null;
+  if (!turn) return null;
 
   const canRespond = !isLoading;
-  const sheIsStillTalking = hasClip && !clipWatched;
+  const stillTalking = hasClip && !clipWatched;
 
-  // Which of the three are still open on a second attempt. Named by move, not
-  // by content: RETRY_PROMPT says "name how they feel", never the feeling.
-  const stillOpen = carriedChecks
-    ? SUB_SKILL_ORDER.filter((skill) => !checkBySkill(carriedChecks)[skill].captured)
-    : [];
-
+  const stillOpen = carriedCriteria?.filter((criterion) => !criterion.captured) ?? [];
   const label =
     stillOpen.length > 0
-      ? `Try again — this time, ${joinPhrases(stillOpen.map((skill) => RETRY_PROMPT[skill]))}.`
-      : `What would you say back to ${beat.speaker}?`;
+      ? `Try again — ${stillOpen.length} of the three is still open.`
+      : `What would you say back to ${turn.speaker}?`;
 
   return (
-    <div className="composer">
-      <ComposerGuide
-        key={`${beat.id}-${attemptNumber}`}
-        teaches={teaches}
-        checks={carriedChecks}
-        startOpen={beat.turnNumber === 1 || attemptNumber > 1}
+    <div className="composer coach-surface">
+      <p className="card-kicker composer-kicker">YOUR TURN</p>
+      <CoachingCard
+        key={`${turn.id}-${attemptNumber}`}
+        coaching={coaching}
+        openCriteria={carriedCriteria}
+        startOpen={turn.turnNumber === 1 || attemptNumber > 1}
       />
       <label htmlFor="reflection-draft">{label}</label>
       {attemptNumber > 1 && (
         <p className="composer-attempt">
-          Attempt {attemptNumber} of {MAX_ATTEMPTS_PER_BEAT}
+          Attempt {attemptNumber} of {MAX_ATTEMPTS_PER_TURN}
         </p>
       )}
       <textarea
@@ -101,7 +92,7 @@ export default function Composer({ practice }: { practice: Practising }) {
           onClick={submitReflection}
           disabled={!canRespond || !draft.trim()}
         >
-          Reflect back →
+          Send reply →
         </button>
       </div>
       {/* Said once, up front, rather than as a failure after they press it. */}
@@ -112,9 +103,9 @@ export default function Composer({ practice }: { practice: Practising }) {
           Writing down what you said…
         </p>
       ) : (
-        sheIsStillTalking && (
+        stillTalking && (
           <p className="composer-hint">
-            {beat.speaker} is still talking — reply whenever you're ready.
+            {turn.speaker} is still talking — reply whenever you're ready.
           </p>
         )
       )}

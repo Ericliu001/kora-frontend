@@ -2,17 +2,7 @@
 // backend/src/main/kotlin/com/buddygo/gym/GymModels.kt. TypeScript checks that
 // we *use* them consistently; it cannot check that the server really sends them.
 
-export type SubSkill = 'FACTS' | 'FEELING' | 'INVITATION';
 export type Level = 'DEVELOPING' | 'BETTER' | 'BEST';
-
-export interface SubSkillInfo {
-  skill: SubSkill;
-  label: string;
-  /** The instruction — what to do. */
-  description: string;
-  /** Why it works. Shown next to the instruction, before the learner replies. */
-  purpose: string;
-}
 
 /**
  * One of the three things the training ground teaches, with everything under it.
@@ -30,9 +20,9 @@ export interface CatalogModule {
 /**
  * A unit as the catalogue lists it.
  *
- * The optional four are what a unit that has not been written yet does not
- * have. Absent rather than zero, so a locked tile leaves the line out instead
- * of claiming "0 sub-skills · about 0 min".
+ * `turnCount` is the one thing a preview has not got, so it is optional: the
+ * tile leaves that line out rather than claiming "0 turns". What it teaches and
+ * how long it takes every unit knows before anyone writes a line of it.
  */
 export interface UnitSummary {
   id: string;
@@ -40,73 +30,110 @@ export interface UnitSummary {
   title: string;
   blurb: string;
   playable: boolean;
-  skill?: string | null;
-  subSkillCount?: number | null;
-  estimatedMinutes?: number | null;
-  coverUrl?: string | null;
+  skill: string;
+  estimatedMinutes: number;
+  turnCount?: number | null;
 }
 
 /**
- * A practice, as it begins.
+ * The one move being practised on this turn.
  *
- * [teaches] rides along deliberately. It is what the composer puts in front of
- * the learner before they reply, and carrying it here is what lets a click on a
- * tile go straight into practice with no page in between to fetch it.
+ * All of it, `example` included, is in front of the learner *before* they
+ * reply. That is the shape of the teaching: here is the move, here is why it
+ * works, here is one way to do it — now say it with the facts of your own life.
  */
+export interface Coaching {
+  skillKey: string;
+  label: string;
+  instruction: string;
+  purpose: string;
+  example: string;
+}
+
+/** A practice, as it begins. */
 export interface Practice {
   id: string;
   unitId: string;
   unitTitle: string;
-  teaches: SubSkillInfo[];
-  beat: Beat;
+  userGoal: string;
+  turnCount: number;
+  turn: Turn;
 }
 
-/** One thing the speaker says. `videoUrl` is absent on written beats. */
-export interface Beat {
+/**
+ * One thing the character says.
+ *
+ * `bridge` is their reaction to what you just said and `line` is the authored
+ * continuation; they arrive separately because only the second one is fixed.
+ * `videoUrl` is absent on a written turn, which today is every turn.
+ */
+export interface Turn {
   id: string;
   speaker: string;
-  transcript: string;
   turnNumber: number;
+  bridge?: string | null;
+  line: string;
+  coaching: Coaching;
   videoUrl?: string;
   audioUrl?: string;
   posterUrl?: string;
   durationSeconds?: number;
 }
 
-export interface Check {
+/**
+ * How one check landed.
+ *
+ * `guidance` names what was missing, in the author's words, and arrives only
+ * for a check that was missed. The requirement behind it — and the instruction
+ * for repairing it — stay on the server.
+ */
+export interface CriterionResult {
+  id: string;
+  label: string;
   captured: boolean;
   evidence?: string;
-  missed?: string;
+  guidance?: string;
 }
 
-export interface Checks {
-  facts: Check;
-  feeling: Check;
-  invitation: Check;
-}
-
-export interface Exemplar {
-  tier: Level;
+/**
+ * A better version of *this* reply.
+ *
+ * `REWRITTEN` is the learner's own words with the missing parts added;
+ * `EXAMPLE` is the authored line, offered when there was no model to do the
+ * rewriting. The two are labelled differently on screen because they promise
+ * different things.
+ */
+export interface StrongerReply {
   text: string;
+  source: 'REWRITTEN' | 'EXAMPLE';
 }
 
 export interface Reflection {
   level: Level;
-  checks: Checks;
+  criteria: CriterionResult[];
   feedback: string;
-  exemplar: Exemplar;
-  attemptsOnBeat: number;
-  /** True when the learner stays on the same beat for another try. */
+  strongerReply: StrongerReply;
+  attemptsOnTurn: number;
+  /** True when the learner stays on the same turn for another try. */
   retry: boolean;
-  nextBeat?: Beat;
+  nextTurn?: Turn;
   complete: boolean;
+}
+
+/** One turn's worth of the recap: which move it taught, and how it went. */
+export interface TurnRecap {
+  turnNumber: number;
+  skillLabel: string;
+  level: Level;
+  met: number;
 }
 
 export interface Recap {
   turnsCompleted: number;
   levels: Level[];
-  strongest?: SubSkill;
-  focus?: SubSkill;
+  turns: TurnRecap[];
+  strongest?: string;
+  focus?: string;
   summary: string;
   suggestedLine: string;
 }
@@ -119,47 +146,34 @@ export interface Utterance {
 }
 
 /**
- * Mirrors MAX_ATTEMPTS_PER_BEAT in backend/.../plugins/GymRouting.kt.
+ * Mirrors MAX_ATTEMPTS_PER_TURN in backend/.../plugins/GymRouting.kt.
  *
  * The server decides when a learner has had enough tries; this copy exists
  * only so the composer can say how many are left. If the two ever disagree,
  * the server is right and this line is the bug.
  */
-export const MAX_ATTEMPTS_PER_BEAT = 3;
-
-/** The three checks, addressable by sub-skill rather than by field name. */
-export const checkBySkill = (checks: Checks): Record<SubSkill, Check> => ({
-  FACTS: checks.facts,
-  FEELING: checks.feeling,
-  INVITATION: checks.invitation,
-});
-
-export const SUB_SKILL_ORDER: SubSkill[] = ['FACTS', 'FEELING', 'INVITATION'];
-
-export const SUB_SKILL_LABEL: Record<SubSkill, string> = {
-  FACTS: 'The facts',
-  FEELING: 'The feeling',
-  INVITATION: 'The invitation',
-};
+export const MAX_ATTEMPTS_PER_TURN = 3;
 
 export const LEVEL_LABEL: Record<Level, string> = {
   DEVELOPING: 'Getting there',
-  BETTER: 'Good reflection',
-  BEST: 'Strong reflection',
+  BETTER: 'Good reply',
+  BEST: 'Strong reply',
 };
 
+/** The character's turn as one utterance: their reaction, then their line. */
+export const spokenTurn = (turn: Turn): string =>
+  [turn.bridge, turn.line].filter(Boolean).join(' ');
+
 /**
- * How each sub-skill is asked for on a second attempt.
+ * What a second attempt is allowed to remember.
  *
- * Deliberately generic: these name the move, never the answer. The rubric's
- * words — what she said, what she feels — stay on the server, so finding them
- * is still the learner's job the second time around.
+ * Only the label and whether it landed. `evidence` and `guidance` carry the
+ * author's own words about what was missing, and they are dropped here — in one
+ * place, so no component can render them beside an empty box and hand back the
+ * answer the learner is meant to find.
  */
-export const RETRY_PROMPT: Record<SubSkill, string> = {
-  FACTS: 'say back what happened',
-  FEELING: 'name how they feel',
-  INVITATION: 'leave them an opening',
-};
+export const carriedCriteria = (criteria: CriterionResult[]): CriterionResult[] =>
+  criteria.map(({ id, label, captured }) => ({ id, label, captured }));
 
 /** "a", "a and b", "a, b and c" — for stitching prompts into one sentence. */
 export function joinPhrases(parts: string[]): string {

@@ -34,3 +34,25 @@ Object.defineProperty(navigator, 'mediaDevices', {
   configurable: true,
   value: { getUserMedia: async () => ({ getTracks: () => [] }) },
 });
+
+/**
+ * jsdom has no matchMedia either. useTheme and Utterance both call it with `?.`
+ * so the app survives without one — but then every test runs as a visitor who
+ * has asked for no motion, which is the one path we least want to be the
+ * default. This stub answers "no preference" to everything, like a browser
+ * with nothing configured.
+ */
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});

@@ -2,14 +2,24 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../api';
 import { AppError, isRetryable, toAppError } from '../errors';
-import { Beat, Checks, Practice, Recap, Reflection, SubSkillInfo, Utterance } from '../types';
+import {
+  carriedCriteria as strip,
+  Coaching,
+  CriterionResult,
+  Practice,
+  Recap,
+  Reflection,
+  spokenTurn,
+  Turn,
+  Utterance,
+} from '../types';
 import { useVoiceInput } from './useVoiceInput';
 
 /**
- * One practice, from the first clip to the recap.
+ * One practice, from the first line to the recap.
  *
  * Everything here is one conversation's worth of state, which is why it is one
- * hook rather than several: the transcript, the beat, the draft and the
+ * hook rather than several: the transcript, the turn, the draft and the
  * feedback all change together, and splitting them would mean keeping them in
  * step by hand.
  *
@@ -21,24 +31,29 @@ export function usePractice() {
 
   const [unitId, setUnitId] = useState<string | null>(null);
   const [unitTitle, setUnitTitle] = useState('');
-  const [teaches, setTeaches] = useState<SubSkillInfo[]>([]);
+  const [userGoal, setUserGoal] = useState('');
+  const [turnCount, setTurnCount] = useState(0);
   const [practiceId, setPracticeId] = useState<string | null>(null);
   // Which tile is waiting on the server. Held here rather than in the grid so
   // the spinner belongs to the practice being created, not to a component that
   // is about to unmount.
   const [startingId, setStartingId] = useState<string | null>(null);
-  const [beat, setBeat] = useState<Beat | null>(null);
+  const [turn, setTurn] = useState<Turn | null>(null);
   const [utterances, setUtterances] = useState<Utterance[]>([]);
   const [clipWatched, setClipWatched] = useState(false);
   const [videoFailed, setVideoFailed] = useState(false);
   const [draft, setDraft] = useState('');
+  // The reply now being judged. Kept because a reply that lands all three
+  // checks is shown its own words back as the model — see FeedbackPanel.
+  const [lastReply, setLastReply] = useState('');
   const [reflection, setReflection] = useState<Reflection | null>(null);
   const [recap, setRecap] = useState<Recap | null>(null);
 
   // What survives a retry. Dropping the checks with the feedback card sent the
   // learner back to an identical blank prompt with nothing to aim at, which is
-  // the one moment in the loop where they most need something to aim at.
-  const [carriedChecks, setCarriedChecks] = useState<Checks | null>(null);
+  // the one moment in the loop where they most need something to aim at. Only
+  // the labels are kept — see `carriedCriteria` in types.ts.
+  const [carried, setCarried] = useState<CriterionResult[] | null>(null);
   const [attemptNumber, setAttemptNumber] = useState(1);
 
   const [isBusy, setIsBusy] = useState(false);
@@ -51,8 +66,8 @@ export function usePractice() {
   const [composerError, setComposerError] = useState<AppError | null>(null);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  // Which beats have already had their line written into the transcript. A ref,
-  // not state, because a retry must not log her line a second time and this
+  // Which turns have already had their line written into the transcript. A ref,
+  // not state, because a retry must not log the line a second time and this
   // must survive Strict Mode's double effect without causing another render.
   const loggedRef = useRef<Set<string>>(new Set());
   // Lets a failed request offer itself back as a retry without any of these
@@ -67,15 +82,15 @@ export function usePractice() {
   const retryable = (failure: AppError, run: () => void): AppError =>
     isRetryable(failure) ? { ...failure, action: { label: 'Try again', run } } : failure;
 
-  /** She stops when the learner takes their turn — talking over each other helps nobody. */
-  const stopHerTalking = useCallback(() => {
+  /** They stop when the learner takes their turn — talking over each other helps nobody. */
+  const stopThemTalking = useCallback(() => {
     const video = videoRef.current;
     if (video && !video.paused) video.pause();
   }, []);
 
   const voice = useVoiceInput({
     practiceId,
-    onBeforeStart: stopHerTalking,
+    onBeforeStart: stopThemTalking,
     onTranscript: setDraft,
   });
 
@@ -86,38 +101,39 @@ export function usePractice() {
       ? 'transcribing'
       : null;
 
-  /** Put her line in the transcript. Once per beat, whenever it first belongs there. */
-  const revealHerLine = useCallback((current: Beat) => {
+  /** Put their line in the transcript. Once per turn, whenever it first belongs there. */
+  const revealTheirLine = useCallback((current: Turn) => {
     if (loggedRef.current.has(current.id)) return;
     loggedRef.current.add(current.id);
     setUtterances((all) => [
       ...all,
-      { speaker: 'THEM', name: current.speaker, text: current.transcript },
+      { speaker: 'THEM', name: current.speaker, text: spokenTurn(current) },
     ]);
   }, []);
 
   /**
-   * Move a finished turn into the transcript. On a filmed beat her line has not
+   * Move a finished turn into the transcript. On a filmed turn the line has not
    * been written down yet, so it goes in just ahead of the reply.
    */
-  const logReply = useCallback((current: Beat, reply: string) => {
+  const logReply = useCallback((current: Turn, reply: string) => {
     setUtterances((all) => {
-      const hers = loggedRef.current.has(current.id)
+      const theirs = loggedRef.current.has(current.id)
         ? []
-        : [{ speaker: 'THEM' as const, name: current.speaker, text: current.transcript }];
+        : [{ speaker: 'THEM' as const, name: current.speaker, text: spokenTurn(current) }];
       loggedRef.current.add(current.id);
-      return [...all, ...hers, { speaker: 'YOU' as const, name: 'You', text: reply }];
+      return [...all, ...theirs, { speaker: 'YOU' as const, name: 'You', text: reply }];
     });
   }, []);
 
-  // No clip to watch — her words go straight into the conversation.
-  const hasClip = !!beat?.videoUrl && !videoFailed;
+  // No clip to watch — the words go straight into the conversation. Today that
+  // is every turn; a filmed one holds its line back until the clip has played.
+  const hasClip = !!turn?.videoUrl && !videoFailed;
   useEffect(() => {
-    if (beat && !hasClip) {
+    if (turn && !hasClip) {
       setClipWatched(true);
-      revealHerLine(beat);
+      revealTheirLine(turn);
     }
-  }, [beat, hasClip, revealHerLine]);
+  }, [turn, hasClip, revealTheirLine]);
 
   /**
    * Begin a unit. One entry point, two callers: a click on a tile, and a
@@ -141,17 +157,18 @@ export function usePractice() {
         setPracticeId(practice.id);
         setUnitId(practice.unitId);
         setUnitTitle(practice.unitTitle);
-        setTeaches(practice.teaches);
+        setUserGoal(practice.userGoal);
+        setTurnCount(practice.turnCount);
         setUtterances([]);
         setReflection(null);
         setRecap(null);
-        setCarriedChecks(null);
+        setCarried(null);
         setComposerError(null);
         setAttemptNumber(1);
         setDraft('');
         setVideoFailed(false);
-        setClipWatched(!practice.beat.videoUrl);
-        setBeat(practice.beat);
+        setClipWatched(!practice.turn.videoUrl);
+        setTurn(practice.turn);
         // Last, so the route guard sees a practice in flight when it renders.
         navigate(`/units/${practice.unitId}`);
       } catch (reason) {
@@ -186,15 +203,16 @@ export function usePractice() {
 
   const submitReflection = useCallback(async () => {
     const text = draft.trim();
-    if (!practiceId || !beat || !text || isLoading) return;
+    if (!practiceId || !turn || !text || isLoading) return;
 
-    stopHerTalking();
+    stopThemTalking();
 
     // Show the reply landing straight away and wait underneath it, rather than
     // leaving the learner staring at their own unsent draft.
     const previousUtterances = utterances;
-    const herLineWasLogged = loggedRef.current.has(beat.id);
-    logReply(beat, text);
+    const theirLineWasLogged = loggedRef.current.has(turn.id);
+    logReply(turn, text);
+    setLastReply(text);
     setDraft('');
     setIsBusy(true);
     setAssessing(true);
@@ -213,10 +231,10 @@ export function usePractice() {
       // from the closure on purpose: the updater form would restore the
       // optimistic value, which is the thing we are undoing.
       setUtterances(previousUtterances);
-      if (!herLineWasLogged) loggedRef.current.delete(beat.id);
+      if (!theirLineWasLogged) loggedRef.current.delete(turn.id);
       setDraft(text);
 
-      const failure = toAppError(reason, 'Unable to send your reflection.');
+      const failure = toAppError(reason, 'Unable to send your reply.');
       // The server read it and said what was wrong with it — that belongs by
       // the box, where fixing it is the retry. Everything else is the request's
       // fault, and the draft is already back, so retrying is one click.
@@ -226,28 +244,28 @@ export function usePractice() {
       setAssessing(false);
       setIsBusy(false);
     }
-  }, [draft, practiceId, beat, isLoading, utterances, logReply, stopHerTalking]);
+  }, [draft, practiceId, turn, isLoading, utterances, logReply, stopThemTalking]);
 
   const continueAfterFeedback = useCallback(async () => {
     if (!reflection) return;
 
     if (reflection.retry) {
-      // Same beat, another go. Her clip has already been watched — and the
-      // checks come with them, so the second attempt starts from what landed
-      // rather than from nothing.
-      setCarriedChecks(reflection.checks);
-      setAttemptNumber(reflection.attemptsOnBeat + 1);
+      // Same turn, another go. The checks come along — stripped to their labels
+      // — so the second attempt starts from what landed rather than from
+      // nothing, without handing back the words that were missing.
+      setCarried(strip(reflection.criteria));
+      setAttemptNumber(reflection.attemptsOnTurn + 1);
       setReflection(null);
       return;
     }
-    if (reflection.nextBeat) {
-      const next = reflection.nextBeat;
+    if (reflection.nextTurn) {
+      const next = reflection.nextTurn;
       setReflection(null);
-      setCarriedChecks(null);
+      setCarried(null);
       setAttemptNumber(1);
       setVideoFailed(false);
       setClipWatched(!next.videoUrl);
-      setBeat(next);
+      setTurn(next);
       return;
     }
     await finish();
@@ -256,15 +274,17 @@ export function usePractice() {
   const restart = useCallback(() => {
     setUnitId(null);
     setUnitTitle('');
-    setTeaches([]);
+    setUserGoal('');
+    setTurnCount(0);
     setPracticeId(null);
-    setBeat(null);
+    setTurn(null);
     setUtterances([]);
     setReflection(null);
-    setCarriedChecks(null);
+    setCarried(null);
     setAttemptNumber(1);
     setRecap(null);
     setDraft('');
+    setLastReply('');
     setError(null);
     setComposerError(null);
     setAssessing(false);
@@ -274,20 +294,26 @@ export function usePractice() {
 
   ops.current = { start, submit: submitReflection, finish };
 
+  /** The move being practised right now. Per turn, not per unit. */
+  const coaching: Coaching | null = turn?.coaching ?? null;
+
   return {
     unitId,
     unitTitle,
-    teaches,
+    userGoal,
+    turnCount,
     startingId,
     practiceId,
-    beat,
+    turn,
+    coaching,
     utterances,
     hasClip,
     clipWatched,
     draft,
     setDraft,
+    lastReply,
     reflection,
-    carriedChecks,
+    carriedCriteria: carried,
     attemptNumber,
     recap,
     isLoading,
