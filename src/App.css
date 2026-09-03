@@ -422,6 +422,8 @@ button.unit-tile:hover:not(:disabled) {
 
 .utterance.them .bubble {
   padding: 18px 22px;
+  border-color: var(--said-border);
+  background: var(--said-bg);
   font-size: 1.1875rem;
   line-height: 1.5;
   box-shadow: var(--shadow-lg);
@@ -475,7 +477,9 @@ button.unit-tile:hover:not(:disabled) {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--text-light);
+  /* currentColor, so the dots are always the colour of the words they are
+   * standing in for — on the character's ground and on any other. */
+  background: currentColor;
   animation: dot-bounce 1.1s ease-in-out infinite;
 }
 

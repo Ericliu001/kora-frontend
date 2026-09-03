@@ -37,6 +37,12 @@
   --danger-bg: #fbe5dd;
   --danger-text: #8d3215;
   --stage: #1b1830;           /* letterbox behind a video */
+  /* The character's bubble. Warm, where the coaching layer's --tint is cool:
+   * the two grounds have to be unmistakable at a glance, so they are given
+   * opposite halves of the brand rather than two strengths of the same wash.
+   * --text-dark clears 13:1 on both, so the line itself never pays for it. */
+  --said-bg: #fdeef7;         /* pink wash, from the logo pink */
+  --said-border: #f6d5e9;
 
   /* Stand-in cover art, one pair per module, so a grid of unwritten units
    * still reads as three distinct groups. Overridden per section in App.css. */
@@ -70,6 +76,10 @@
   --danger-bg: #45211d;
   --danger-text: #fecaca;
   --stage: #0b1020;
+  /* Plum rather than the light wash inverted: at this lightness the tint's
+   * blue and the bubble's pink are told apart by hue, not by brightness. */
+  --said-bg: #3a2340;
+  --said-border: #55345c;
 
   /* Deeper in dark: the same hues at full strength glow against a near-black
    * page and pull the eye off the titles. */
