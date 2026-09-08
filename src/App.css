@@ -519,7 +519,6 @@ button.unit-tile:hover:not(:disabled) {
  * they take the transcript's ground instead — which is also the one place the
  * two languages are allowed to borrow from each other. */
 .coach-surface .stronger-reply,
-.coach-surface .coaching-example,
 .coach-surface .check.pending,
 .coach-surface .guide-row { background: var(--white); }
 
@@ -602,15 +601,22 @@ button.unit-tile:hover:not(:disabled) {
  * rail turns the colour of a check that landed to say so without a word. */
 .stronger-reply.is-your-words { border-left-color: var(--success); }
 
+/* Second voice now, not first: the move to practise is what the learner is
+ * meant to read, and the sample sentence is only there if they get stuck. It
+ * takes the flat ground and the quieter type the instruction used to have. */
 .coaching-example {
   margin: 14px 0 0;
-  padding: 14px 16px;
-  border-left: 3px solid var(--secondary-color);
+  padding: 11px 13px;
   border-radius: 10px;
-  background: var(--tint);
+  background: var(--bg-light);
 }
 
-.coaching-example blockquote { margin: 6px 0 0; font-size: 1.05rem; line-height: 1.45; }
+.coaching-example blockquote {
+  margin: 6px 0 0;
+  color: var(--text-light);
+  font-size: 14px;
+  line-height: 1.45;
+}
 
 .pending-note { margin: 4px 0 0; color: var(--text-light); font-size: 14px; font-style: italic; }
 .composer-hint { margin: 10px 0 0; color: var(--text-light); font-size: 13px; }
@@ -681,13 +687,17 @@ button.unit-tile:hover:not(:disabled) {
 
 .coaching-card ul { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
 
+/* The loudest thing in the card: it carries the rail, the raised ground and
+ * the reading size the example used to wear, so what to do is read before how
+ * someone else said it. */
 .guide-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 11px 13px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--secondary-color);
   border-radius: 10px;
-  background: var(--bg-light);
+  background: var(--white);
 }
 
 .guide-row.captured { background: var(--success-bg); }
@@ -698,8 +708,8 @@ button.unit-tile:hover:not(:disabled) {
 .guide-row.open .guide-mark { color: var(--warn); }
 
 .guide-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.guide-body strong { font-size: 14px; }
-.guide-body span { color: var(--text-light); font-size: 14px; line-height: 1.45; }
+.guide-body strong { font-size: 15px; }
+.guide-body span { color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
 .guide-body em { color: var(--primary-color); font-size: 13px; line-height: 1.45; }
 
 /* On a tinted row the indigo drops to ~4.2:1 in dark mode, under AA for 13px.
