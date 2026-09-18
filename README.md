@@ -219,7 +219,7 @@ click tiles, type replies and read the page, which is why they survived this app
 being split into screens, hooks and components.
 
 The fixtures mirror what the API sends, taken from the authored dialog in the
-parent repository's `data/episodes/start-a-conversation/dialog.json`.
+parent repository's `data/units/start-a-conversation/dialog.json`.
 
 [src/setupTests.ts](src/setupTests.ts) fills the jsdom gaps those tests need:
 jest-dom's matchers; a stub `MediaRecorder` and `navigator.mediaDevices`, so

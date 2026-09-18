@@ -14,7 +14,7 @@ const renderApp = (path = '/') =>
   );
 
 // Fixtures mirroring what the Ktor backend sends, taken from the authored
-// dialog in data/episodes/start-a-conversation/dialog.json.
+// dialog in data/units/start-a-conversation/dialog.json.
 
 /** One move, belonging to one turn — not one trio belonging to the unit. */
 const COACHING = {
