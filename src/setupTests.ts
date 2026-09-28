@@ -34,3 +34,42 @@ Object.defineProperty(navigator, 'mediaDevices', {
   configurable: true,
   value: { getUserMedia: async () => ({ getTracks: () => [] }) },
 });
+
+/**
+ * jsdom has no matchMedia either. useTheme and StepStrip both call it with `?.`
+ * so the app survives without one — but then every test runs as a visitor who
+ * has asked for no motion, which is the one path we least want to be the
+ * default. This stub answers "no preference" to everything, like a browser
+ * with nothing configured.
+ */
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: (query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }),
+});
+
+/**
+ * jsdom has <video> but cannot play one: play() and pause() only log "not
+ * implemented". A filmed turn calls both, so they succeed here; jsdom never
+ * fires the media events that follow, so the tests fire them themselves.
+ */
+Object.defineProperty(HTMLMediaElement.prototype, 'play', {
+  writable: true,
+  configurable: true,
+  value: () => Promise.resolve(),
+});
+
+Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
+  writable: true,
+  configurable: true,
+  value: () => {},
+});

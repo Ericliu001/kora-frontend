@@ -2,27 +2,25 @@ import React, { useState } from 'react';
 import { UnitSummary } from '../types';
 
 /**
- * The cover, or a stand-in for it.
+ * The cover.
  *
- * Almost no unit has footage yet, and generating twenty placeholder images to
- * fill a grid would be twenty files to delete later. A gradient and the unit's
- * own number does the same job: tiles that differ from each other at a glance,
- * and nothing to throw away when the real still arrives.
+ * A filmed unit shows its still — the frame every one of its clips starts on,
+ * so the face on the tile is the face you are about to talk to. Every other
+ * unit, and any still that fails to load, gets a gradient and the unit's own
+ * number instead: tiles that differ at a glance, and nothing to throw away when
+ * a real still arrives.
  *
- * `coverUrl` is server-supplied and the file may not be on disk, so a broken
- * image falls back to the same stand-in rather than showing a torn-page icon.
+ * The image is decoration beside a title that already says what the unit is,
+ * so it has empty alt text rather than a description to read out.
  */
-function UnitCover({ unit, index }: { unit: UnitSummary; index: number }) {
+function UnitCover({ index, coverUrl }: { index: number; coverUrl?: string | null }) {
   const [failed, setFailed] = useState(false);
-  const generated = !unit.coverUrl || failed;
-
+  if (!coverUrl || failed) {
+    return <span className="unit-cover is-generated" data-index={index} aria-hidden="true" />;
+  }
   return (
-    <span
-      className={generated ? 'unit-cover is-generated' : 'unit-cover'}
-      data-index={index}
-      aria-hidden="true"
-    >
-      {!generated && <img src={unit.coverUrl as string} alt="" onError={() => setFailed(true)} />}
+    <span className="unit-cover" aria-hidden="true">
+      <img src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
     </span>
   );
 }
@@ -39,13 +37,25 @@ export default function UnitTile({
   isStarting: boolean;
   onStart: () => void;
 }) {
+  /**
+   * Every tile says what it teaches and roughly how long it takes, whether or
+   * not anyone has written it. A roadmap that will not say what is on it is not
+   * much of a roadmap — and the catalogue knows both facts about all of them.
+   */
+  const meta = (
+    <span className="unit-meta">
+      {isStarting ? 'Starting…' : `${unit.skill} · about ${unit.estimatedMinutes} min`}
+      {unit.playable && !isStarting && ' →'}
+    </span>
+  );
+
   const body = (
     <>
-      <UnitCover unit={unit} index={index} />
+      <UnitCover index={index} coverUrl={unit.coverUrl} />
       <span className="unit-body">
         <span className="card-kicker">
           UNIT {index}
-          {!unit.playable && <span className="unit-badge">Coming soon</span>}
+          {!unit.playable && <span className="unit-badge">Preview</span>}
         </span>
         <strong>{unit.title}</strong>
         <span className="unit-blurb">{unit.blurb}</span>
@@ -62,7 +72,12 @@ export default function UnitTile({
    * in browse mode, has nothing focusable to disappoint, and nothing to click.
    */
   if (!unit.playable) {
-    return <article className="unit-tile is-locked">{body}</article>;
+    return (
+      <article className="unit-tile is-locked">
+        {body}
+        {meta}
+      </article>
+    );
   }
 
   return (
@@ -73,15 +88,7 @@ export default function UnitTile({
       aria-busy={isStarting}
     >
       {body}
-      <span className="unit-meta">
-        {isStarting ? (
-          'Starting…'
-        ) : (
-          <>
-            {unit.subSkillCount} sub-skills · about {unit.estimatedMinutes} min →
-          </>
-        )}
-      </span>
+      {meta}
     </button>
   );
 }

@@ -1,74 +1,121 @@
-# Kora frontend
+# Onion Loop — the web app
 
-This is Kora's React web app: a training ground for learning to talk to people. Three modules — Skills, Emotions, Heart — each holding units. A learner picks a unit, watches someone say something real, replies by voice or text, and finds out exactly what they caught and what they missed.
+The React app a learner actually uses: a training ground for learning to talk to
+people. Three modules — Skills, Emotions, Heart — hold 34 units, of which five
+are written and 29 are previews on the map. A unit is a short conversation with
+one character over three to five turns.
+
+Every turn works the same way. The character says something. The app names the
+one move being practised — its label, what to do, why it works, one worked
+example — **before** the learner replies. The reply comes back graded on three
+checks, each marked caught or missed with the author's evidence or guidance, and
+a weak one can be tried again, up to three attempts. At the end there is a recap.
+
+Create React App, React 19, TypeScript, React Router 6. No state library, no
+CSS-in-JS, no component kit. The curriculum, the practice session and the grading
+all live on the Kotlin/Ktor API; this app renders what it is given.
 
 ## Run it
 
-Install packages once:
+Install once, then start the dev server:
 
 ```bash
 npm install
-```
-
-Start the development server:
-
-```bash
 npm start
 ```
 
-Open `http://localhost:3000`. The app expects the Ktor backend to be running at `http://localhost:8080`.
+That serves the app on `http://localhost:3000` and expects the API on
+`http://localhost:8080`, so the backend has to be running too. From the parent
+repository, `./launch` starts both in one terminal, installs these packages on first
+run and passes the API base URL through — the usual way in.
 
-Useful checks:
-
-```bash
-npm test -- --watchAll=false
-npm run build
-```
-
-To point the web app at a deployed backend instead of your local one:
+Point the app at a deployed API instead by setting the one environment variable
+it has:
 
 ```bash
 REACT_APP_API_BASE_URL="https://your-api.example.com/api" npm start
 ```
 
-## Where the frontend starts
+The four scripts in `package.json` are the Create React App defaults: `start`,
+`build`, `test` and `eject`. Run the suite non-interactively with
+`npm test -- --watchAll=false`, which is what `make test-frontend` does upstream.
 
-The browser starts at [index.tsx](src/index.tsx). It finds the `root` element in `public/index.html`
-and renders `<App />` inside a `<BrowserRouter>`. The router lives there rather than inside `App` so
-tests can mount `App` under a `MemoryRouter` and drive navigation without touching the address bar.
+## How it is put together
 
-[App.tsx](src/App.tsx) is a shell: the chrome, the routes, and the error banner. The state lives in
-two hooks it calls — `useCatalog` for what the home page lists, `usePractice` for the one conversation
-in flight — and the screens read them.
+`index.tsx` mounts `<App />` inside a `<BrowserRouter>` and `<React.StrictMode>`.
+The router is deliberately outside `App` rather than inside it, so tests can
+mount the same component under a `MemoryRouter` and drive navigation without
+touching the address bar.
 
-## Brand and theming
+`App.tsx` is 93 lines and holds no feature logic. It renders the chrome, declares
+the routes, clears errors and scrolls to the top on navigation, and decides
+whether an error belongs in the banner above the page or to the screen itself.
 
-Kora wears the Onion Loop brand. The whole palette lives as CSS custom properties in
-[index.css](src/index.css) — one `:root` block for light, one `[data-theme="dark"]` block for dark —
-and **no rule in [App.css](src/App.css) names a colour directly**. That is what lets the app switch
-theme by setting one attribute on `<html>`, with no component re-rendering.
+The one thing it owns is state: `usePractice()` is called at the top of `App` and
+handed down. A practice outlives the screen that started it — the recap is a
+different route reading the same conversation — so the hook cannot live inside
+the practice screen, and two consumers do not justify a context.
 
-If you add a colour, add a token. A hex baked into a rule is a light-mode colour that survives the
-theme switch and breaks dark mode.
+The layering rule underneath that is worth keeping:
 
-A few wash values (`--success-bg`, `--warn-bg`, and `--tint` in dark) look like odd numbers because
-they are: at rounder values the text on them lands just under WCAG AA 4.5:1. Check contrast before
-rounding them off.
+- **components** render what they are given and hold nothing but local UI state;
+- **hooks** hold state and are the only code that calls the network;
+- **screens** compose components and read hooks, and nothing else;
+- `api.ts` is imported by hooks only — no screen or component imports it.
 
-| Piece | Where |
+| Path | What it is |
 | --- | --- |
-| Tokens, light and dark | [src/index.css](src/index.css) |
-| Component styling | [src/App.css](src/App.css) |
-| Header, footer | [src/components/SiteHeader.tsx](src/components/SiteHeader.tsx), [SiteFooter.tsx](src/components/SiteFooter.tsx) |
-| Theme state | [src/hooks/useTheme.ts](src/hooks/useTheme.ts) |
-| Pre-paint theme (stops the dark-mode flash) | inline script in [public/index.html](public/index.html) |
-| Logo, onion pattern | `public/brand/`, `src/assets/onion-pattern.svg` |
+| [src/index.tsx](src/index.tsx) | Entry point: root, router, strict mode |
+| [src/App.tsx](src/App.tsx) | The shell: chrome, routes, the one practice |
+| [src/screens/HomeScreen.tsx](src/screens/HomeScreen.tsx) | The map: hero, three module sections, unit tiles, loading skeleton |
+| [src/screens/PracticeScreen.tsx](src/screens/PracticeScreen.tsx) | The practice room: the unit beside a row of turn pages, the URL-driven start |
+| [src/screens/RecapScreen.tsx](src/screens/RecapScreen.tsx) | The recap, turn by turn, and one line worth keeping |
+| [src/hooks/usePractice.ts](src/hooks/usePractice.ts) | One practice from first line to recap — the real state machine |
+| [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) | The whole curriculum in one request, plus `findUnit` and a reload |
+| [src/hooks/useVoiceInput.ts](src/hooks/useVoiceInput.ts) | Microphone, recording and transcription upload |
+| [src/hooks/useTheme.ts](src/hooks/useTheme.ts) | Light/dark, stored and applied to `<html>` |
+| [src/components/](src/components) | Everything a screen is made of (see below) |
+| [src/api.ts](src/api.ts) | The single HTTP helper, and the two failure types |
+| [src/errors.ts](src/errors.ts) | One `AppError`, and where each kind is shown |
+| [src/types.ts](src/types.ts) | Wire types, mirrored by hand from the Kotlin |
 
-The preference is stored under the `theme` key in `localStorage` — the same key the marketing site
-at onionloop.com uses, so a visitor's choice carries across both.
+The components: `SiteHeader` and `SiteFooter` (chrome, and the theme toggle),
+`UnitTile` (one unit on the map, or a preview that is deliberately not a button;
+its cover is the unit still when the catalogue sends a `coverUrl`, and a drawn
+gradient with the unit's number otherwise, or if the still fails to load),
+`Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
+(the move to practise), `ReflectionScorecard` and `FeedbackPanel` (the three
+checks and what to take away), `ReflectionPending` (the same shape while the
+server is judging), `ErrorNotice` (every error a person sees, in three shapes),
+and the practice itself — see [One page per turn](#one-page-per-turn):
+`StepStrip` (the sideways row of pages and its nav), `StepPage` (one turn),
+`StepClip` (a filmed turn's clip, its Play button and its words toggle) and
+`Said` (anything a person said). The way out, **← All units**, is the first
+thing on the practice page, above everything else, at every width.
 
-> The onion pattern is imported from `src/assets/`, not `public/`. A root-absolute `url('/…')` in a
-> CRA stylesheet fails to resolve at build time; importing it from `src/` also gets it fingerprinted.
+## One page per turn
+
+A practice is a row of pages, one per turn reached, side by side in a
+horizontal scroller that snaps a page at a time. The browser does the swiping —
+touch, trackpad and scroll wheel all work with nothing listening for gestures —
+and the nav above the row adds ← → buttons, one dot per turn and the arrow keys
+(ignored while typing in the reply box). `overscroll-behavior-x: contain` stops
+a swipe at either end from turning into the browser's own back gesture.
+
+Each page, top to bottom: the character's reaction to your last reply (a later
+turn only), their line — the clip on a filmed turn, the words on a written one —
+and then either the composer and feedback, on the turn being worked on, or, on a
+page already left, the reply you moved on with and a folded "how it landed".
+
+Pages exist only up to the turn being worked on: there is nothing ahead of it
+until you have replied, so later dots are placeholders. **Looking is not
+moving.** `usePractice` holds `steps` — each turn reached, and the outcome of the
+ones left behind — and the turn being worked on is always the last step. Which
+page is on screen belongs to `StepStrip` and is read back from the scroll
+position, so swiping back to turn 1 never changes where the practice is.
+
+The row is held to the height of the page on screen, not its tallest page, so a
+short finished page does not sit above a screen of nothing.
 
 ## Routes
 
@@ -79,168 +126,164 @@ at onionloop.com uses, so a visitor's choice carries across both.
 | `/units/:unitId/recap` | The recap |
 | `/modules/:moduleId` | Redirects to `/units/:moduleId` — bookmarks from before units had their own name |
 
-There is no page between the grid and the practice room. Clicking a tile creates the practice and
-then navigates, in that order, so a failure leaves the learner on the home page beside the tile they
-clicked rather than on a practice screen that would have to explain itself. The same `start()` runs
-from the other direction when `/units/:unitId` is pasted into a fresh tab.
+Anything else redirects to `/`. There is no page between the map and the practice
+room: clicking a tile creates the practice and *then* navigates, in that order,
+so a failure leaves the learner on the home page beside the tile they clicked
+rather than on a practice screen that would have to explain itself. The same
+`start()` runs from the other direction when `/units/:unitId` is pasted into a
+fresh tab.
 
-A unit that is in the catalogue but has no exercises yet is answered from the catalogue — that URL
-says "isn't built yet" without asking the server, because the server would give the same answer one
-round trip later.
+A unit that is in the catalogue but not written yet is answered from the
+catalogue, without asking the server: the server would give the same answer one
+round trip later, and with 29 previews that is now the common case.
 
-`/units/:unitId/recap` redirects to `/` when there is nothing in flight: a practice lives in memory
-only, so there is no conversation to resume after a reload.
+`/units/:unitId/recap` redirects to `/` when there is nothing in flight. A
+practice lives in memory only, so there is nothing to resume after a reload.
 
-Client-side routing needs the host to serve `index.html` for every path. `public/_redirects` covers
-Netlify; on GitHub Pages, copy `index.html` to `404.html` after building.
+Client-side routing needs the host to serve `index.html` for every path.
+`public/_redirects` covers Netlify; on GitHub Pages, copy `index.html` to
+`404.html` after building.
 
-## How data moves through the web app
+## Talking to the API
 
-```mermaid
-flowchart TD
-    Start[index.tsx renders App] --> Catalog[GET /api/catalog]
-    Catalog --> Grid[Three module sections of unit tiles]
-    Grid --> Click[Click a unit that is built]
-    Click --> Create[POST /api/practices with unitId]
-    Create --> Room[Practice room, turn 1]
-    Room --> Type[Type a reply]
-    Room --> Speak[Record voice]
-    Speak --> Transcribe[POST .../transcribe]
-    Transcribe --> Type
-    Type --> Send[POST .../reflections]
-    Send --> Feedback[Three checks, one coaching line, a stronger reply]
-    Feedback --> Retry[Same beat, another go]
-    Retry --> Room
-    Feedback --> Next[Next beat]
-    Next --> Room
-    Feedback --> Finish[POST .../complete]
-    Finish --> Recap[Recap]
-```
+Every request goes through one function, `request<T>()` in
+[src/api.ts](src/api.ts). The base URL is `REACT_APP_API_BASE_URL`, defaulting to
+`http://localhost:8080/api`. It sets JSON headers for normal requests, leaves
+`FormData` untouched so audio uploads keep their own boundary, and times
+everything out after 10 seconds — 45 for the two calls that wait on a model,
+`/reflections` and `/transcribe`.
 
-Every request goes through `request<T>()` in [src/api.ts](src/api.ts). It sets JSON headers for
-normal requests, leaves `FormData` untouched for audio uploads, and gives everything a timeout —
-10s, or 45s for the two calls that wait on a model.
+Five endpoints are used: `GET /catalog`, `POST /practices`, and the three under
+`POST /practices/:id/` — `transcribe`, `reflections` and `complete`.
 
-## Where the pieces live
-
-| Piece | Where |
-| --- | --- |
-| Shell, routes, error banner | [src/App.tsx](src/App.tsx) |
-| The curriculum, as fetched | [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) |
-| One practice, start to recap | [src/hooks/usePractice.ts](src/hooks/usePractice.ts) |
-| Microphone and transcription | [src/hooks/useVoiceInput.ts](src/hooks/useVoiceInput.ts) |
-| Screens | [src/screens/](src/screens) |
-| Everything a screen is made of | [src/components/](src/components) |
-| HTTP, and the two failure types | [src/api.ts](src/api.ts) |
-| What a failure means, and its words | [src/errors.ts](src/errors.ts) |
-| Wire types mirroring the Kotlin | [src/types.ts](src/types.ts) |
-
-`usePractice` is called once, in `App`, and handed to the screens that need it. A practice outlives
-the screen that started it — the recap is a different route reading the same conversation — and two
-consumers is not enough to justify a context.
+> **The wire types are mirrored by hand.** [src/types.ts](src/types.ts) is a
+> transcription of the Kotlin `@Serializable` classes, and nothing generates or
+> checks it. `request<T>` ends in `return body as T`: the type parameter is a
+> promise to the compiler, not a runtime check. If the API changes a field, this
+> still compiles and fails later, in the component that reads the missing one.
+> When the contract moves, this file moves by hand or not at all.
 
 ## Errors
 
-There is no generic "something went wrong" any more. Every failure leaves `api.ts` as one of two
-types (`NetworkError`, `ApiError`), `toAppError` in [src/errors.ts](src/errors.ts) turns it into an
-`AppError` with a `kind`, and the `kind` decides where it is shown:
+There is no generic "something went wrong". Every failure leaves `api.ts` as one
+of exactly two types — `NetworkError` (the server never answered) or `ApiError`
+(the server answered and said no). `toAppError` in [src/errors.ts](src/errors.ts)
+turns either into one `AppError` with a `kind`, and the `kind` decides where it
+is shown:
 
 | Where | Which failures | Why there |
 | --- | --- | --- |
-| Banner, above the page | offline, timeout, 5xx | The page still works. Dismissible, and cleared on navigation, so an error raised on one screen cannot follow you to the next. Carries **Try again**, because the same request could work twice. |
-| Inline, by the control | a 4xx with a message, no microphone, microphone refused | Fixing the input *is* the retry. The server's own words are used verbatim — it knows what was wrong with the request and we do not. |
+| Banner, above the page | offline, timeout, 5xx | The page still works. Dismissible, cleared on navigation, and carries **Try again**, because the same request could work twice. |
+| Inline, beside the control | a 4xx with a message, no microphone, microphone refused | Fixing the input *is* the retry. The server's own words are used verbatim: it knows what was wrong with the request and we do not. |
 | Page, replacing the content | unknown unit (404), unit not built yet (409), practice finished (409), catalogue failed to load | There is nothing else on the page worth showing. |
 
-Two things are deliberately silent: a clip that will not load (the transcript takes over and the
-exercise carries on — an alert about a handled failure is noise), and the server's own message on a
-5xx (it can be a stack detail; the fixed copy is what a person reads).
+A 5xx keeps the server's message off screen — at that status it can be a stack
+detail, and fixed copy is what a person should read; the detail goes to
+`console.warn` instead. A reply that fails to send comes back off the page and
+into the box, draft included.
 
 ## Media
 
-Video, posters and unit cover images are **not in this repository**. They live in a private
-Cloudflare R2 bucket, served by a small read-only Worker at `media.onionloop.com`, and the API sends
-absolute URLs to them:
+A filmed turn arrives with `videoUrl` and `posterUrl` — absolute URLs the
+backend builds from bucket paths and `MEDIA_BASE_URL` — and `StepClip` plays it.
+The clip speaks the authored `line` word for word; the bridge before it is
+written live after your reply, so it stays text. Units without clips work
+exactly as before: the line is shown as words.
 
-```jsonc
-// POST /api/practices
-"beat": {
-  "videoUrl":  "https://media.onionloop.com/beats/new-job-1/5014424cade0/720.mp4",
-  "posterUrl": "https://media.onionloop.com/beats/new-job-1/5014424cade0/poster.jpg",
-  "durationSeconds": 15
-}
-```
+`StepClip` never starts a clip by itself. It shows the poster — the unit still,
+which is the clip's own first frame — under one large **Play** button, which
+comes back as Resume or Play again whenever the clip is paused or has ended;
+scrolling the page away pauses it. A **Show the words** toggle under every clip
+reveals the line as text. If the clip will not load, the words are shown
+instead, so a broken video costs the video and nothing else. While a clip plays
+the composer says "still talking — reply whenever you're ready"; replying is
+never blocked, and speaking pauses the clip.
 
-The web app's entire involvement is putting those strings into `src` attributes:
+Voice input:
+[useVoiceInput](src/hooks/useVoiceInput.ts) records with `MediaRecorder`, uploads
+the blob as `FormData` to `/practices/:id/transcribe`, and puts the transcript
+into the draft, where the learner can edit it before sending. Support is decided
+at mount, not on click, so a browser that cannot record says so beside the box
+rather than failing when pressed; a refused microphone says the same. Either way
+you can still type, and leaving mid-recording stops the tracks.
 
-| Field | Rendered by |
-| --- | --- |
-| `beat.videoUrl`, `beat.posterUrl` | [BeatStage.tsx](src/components/BeatStage.tsx) |
-| `unit.coverUrl` | [UnitTile.tsx](src/components/UnitTile.tsx) |
+## Styling
 
-There is no media configuration here, and there should not be. `REACT_APP_API_BASE_URL` is the only
-environment variable the frontend has; the media host arrives inside the API response, so pointing
-the app at a staging backend automatically points it at that backend's bucket.
+Two stylesheets and nothing else: [src/index.css](src/index.css) holds the design
+tokens — one `:root` block for light, one `[data-theme="dark"]` block for dark —
+and [src/App.css](src/App.css) holds every rule in the app. Theme switching is
+one attribute on `<html>`, set by `useTheme`, with no component re-rendering.
 
-That the bytes moved from `public/` to a bucket, and then from a public bucket to a Worker in front
-of a private one, changed nothing in this repository either time. Both times the whole delivery
-mechanism was swapped underneath a component that only ever knew a URL — which is the argument for
-keeping it that way.
+If you add a colour, add a token. A hex baked into a rule is a light-mode colour
+that survives the theme switch and breaks dark mode. The only rules that name a
+colour directly are the ones whose surface is dark in both themes — the hero
+gradient and the footer overlay — and they are exceptions,
+not a precedent.
 
-### Adding or replacing a clip
+A few wash values (`--success-bg`, `--warn-bg`, `--tint` in dark) look like odd
+numbers because they are: at rounder values the text on them lands just under
+WCAG AA 4.5:1. Check contrast before tidying.
 
-**Nothing in this repository changes.** Publish the clip with `tools/publish-media.sh` (in the
-umbrella `kora` repo — `tools/README.md` there is the full guide) and paste the path it prints into
-the Kotlin unit. The next `/api/practices` response carries the new URL and the player picks it up.
+The preference is stored under the `theme` key in `localStorage`, the same key
+the marketing site uses, so a visitor's choice carries across both. An inline
+script in `public/index.html` applies it before first paint — that is what stops
+the white flash on load — and is kept in step with `useTheme` by hand. The onion
+pattern is imported from `src/assets/`, not `public/`: a root-absolute `url('/…')`
+in a CRA stylesheet does not resolve at build time, and importing it from `src/`
+fingerprints it too.
 
-Two things follow from that, and both are worth not undoing:
+## Accessibility worth knowing about
 
-- **Never put unit media back under `public/`.** A root-absolute `/units/…` path resolves against
-  the dev server and works beautifully on your laptop, then 404s in production, where the frontend
-  is static files on Cloudflare Pages and has no such folder. What is left under `public/` is brand
-  assets and the CRA icons — see [Brand and theming](#brand-and-theming).
-- **No cache-busting, ever.** Media URLs contain the content hash of the file, so a reshoot is a new
-  URL. A `?v=2` query string on top of that would only defeat the caching.
+- A preview unit is plain content, not a `disabled` button. A disabled button
+  leaves the tab order, so a screen reader user tabbing the grid would never
+  learn those units exist — and being read is the whole job of a roadmap.
+- Each page is a labelled region ("Turn 2 of 4"), the current dot carries
+  `aria-current="step"`, and the "Turn N of M" counter is `aria-live="polite"`,
+  so moving between pages is announced.
+- Banner and inline errors are `role="alert"`. A page-level error is not: it
+  takes focus on its heading instead, so it is read as a heading rather than
+  shouted over whatever the person was doing.
+- `prefers-reduced-motion` is honoured in CSS *and* in JS — `StepStrip` jumps
+  between pages instead of gliding.
+- Waiting states announce themselves through `role="status"`.
 
-### Local development
+## Testing
 
-Once the media Worker is deployed, you need no bucket, no credential and no local files: the backend
-defaults `MEDIA_BASE_URL` to production and the assets are public and immutable, so `npm start`
-plays the same clips a learner sees.
+One test file, [src/App.test.tsx](src/App.test.tsx): 42 tests that render the
+real `App` under a `MemoryRouter` against a stubbed `global.fetch`, grouped as
+the curriculum, getting into a practice, arriving by URL, the conversation,
+the coaching, one page per turn and filmed turns. Nothing is shallow-rendered and no hook is tested alone — the tests
+click tiles, type replies and read the page, which is why they survived this app
+being split into screens, hooks and components.
 
-**Before it is deployed**, that default points at a hostname that does not resolve and every beat
-falls back to text. To work without it, put the published files under `public/` and point the
-backend at the dev server:
+The fixtures mirror what the API sends, taken from the authored dialog in the
+parent repository's `data/units/start-a-conversation/dialog.json`.
 
-```bash
-# once — the files come out of tools/publish-media.sh
-mkdir -p public/beats/new-job-1/5014424cade0
-cp ../tools/dist/beats/new-job-1/5014424cade0/{720.mp4,poster.jpg} $_
+[src/setupTests.ts](src/setupTests.ts) fills the jsdom gaps those tests need:
+jest-dom's matchers; a stub `MediaRecorder` and `navigator.mediaDevices`, so
+feature detection says "recording works" by default and the tests that care about
+the other case take them away deliberately; a `matchMedia` answering "no
+preference", so tests do not all run as a visitor who asked for no motion; and
+`play()`/`pause()` on media elements, which jsdom does not implement.
 
-# then run the backend against them
-cd ../backend && MEDIA_BASE_URL=http://localhost:3000 ./gradlew run
-```
+## Where to read more
 
-CRA serves `public/` at the site root, so those files land on exactly the paths the manifest asks
-for. `public/beats` is git-ignored, so this never reaches a build — which is the only thing that
-makes it acceptable. It is a bridge until the Worker is up, not a place for media to live; the
-warning above about `public/` still stands for anything that ships.
+Long-form explanations live in the parent repository, and resolve from here with
+this submodule checked out inside it.
 
-Offline, they will not load — and that is fine, because it exercises the fallback:
-
-| Failure | What the learner gets |
-| --- | --- |
-| Clip will not load | `onError` fires, her line moves into the transcript, and the exercise carries on. **No error message** — the failure is already handled, and an alert about it would be noise. |
-| Cover will not load | `UnitTile` falls back to a CSS gradient tile. |
-
-Both paths are covered by tests, including *"a missing clip falls back to her words rather than
-blocking the exercise"*. They were the "you forgot to add the file" story when media lived in this
-repo; now they are the CDN-outage story, which is a better reason to keep them working.
-
-To see it deliberately: DevTools → Network → right-click any `media.onionloop.com` request → **Block
-request domain**, then reload and start a practice.
+- [The frontend as it is](../codelab/part2-kora/modules/03-the-frontend-as-it-is.md)
+  — this app read in the order it is built, with `usePractice` read closely.
+- [One request, end to end](../codelab/part2-kora/modules/04-one-request-end-to-end.md)
+  — every hop of a reply, file and symbol at each one.
+- [Frontend/backend boundary](../codelab/part2-kora/reference/frontend-backend-boundary.md)
+  — what crosses, what deliberately does not, and who owns which decision.
+- [API contract](../codelab/part2-kora/reference/api-contract.md)
+  — every route and both wire types, with a change log.
+- [Debugging the frontend](../codelab/part1-foundations/reference/debugging-the-frontend.md)
+  — symptom first.
 
 ## Adding a unit
 
-Nothing here either. The catalogue is served by the backend, including the units nobody has written
-yet — the browser holds no list of titles to keep in step. Add it to
-`backend/src/main/kotlin/com/buddygo/gym/Catalog.kt`, and its media with `tools/publish-media.sh`.
+Nothing changes in this repository: the catalogue is served by the API, previews
+included, so the browser holds no list of titles to keep in step. Units are
+authored in the parent repository's `data/`, from which the Kotlin is generated.

@@ -207,7 +207,16 @@ button.unit-tile:hover:not(:disabled) {
   background: var(--tint);
 }
 
-.unit-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+.unit-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .4s ease;
+}
+
+button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); }
 
 /* No footage yet. A gradient and the unit's own number tell tiles apart
  * without twenty placeholder files to delete later. */
@@ -255,6 +264,8 @@ button.unit-tile:hover:not(:disabled) {
   font-size: 13px;
   font-weight: 700;
 }
+
+.is-locked .unit-meta { color: var(--text-light); font-weight: 600; }
 
 .unit-badge {
   margin-left: 8px;
@@ -320,65 +331,261 @@ button.unit-tile:hover:not(:disabled) {
   gap: 42px;
 }
 
-.practice-side { padding-top: 56px; }
+.practice-top { grid-column: 1 / -1; padding-top: 24px; }
+
+.back-to-units {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: .7rem 1.25rem;
+  border: 1.5px solid var(--primary-color);
+  border-radius: 999px;
+  background: var(--white);
+  color: var(--primary-color);
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: var(--shadow);
+  transition: background .2s ease, color .2s ease;
+}
+
+.back-to-units:hover,
+.back-to-units:focus-visible { background: var(--primary-color); color: var(--on-primary); }
+
+.practice-side { padding-top: 20px; }
 .practice-side h2 { margin: 0 0 22px; font-size: 1.75rem; font-weight: 700; line-height: 1.15; }
 
-.practice-panel { position: relative; padding: 34px 0 56px; }
+.practice-panel { position: relative; padding: 20px 0 56px; }
 
-.stage { margin-bottom: 26px; }
+/* --- Steps -------------------------------------------------------------- *
+ *
+ * One page per turn, side by side in a row that scrolls sideways and snaps a
+ * page at a time. The browser does the swiping — touch, trackpad and wheel —
+ * and the nav above the row does the rest.
+ */
 
+/* A grid child will not shrink below its content without this, and the row's
+ * content is every page laid end to end. */
+.practice-panel { min-width: 0; }
+
+.step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin-bottom: 20px;
+}
+
+.step-arrow {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  background: var(--white);
+  color: var(--text-dark);
+  font-weight: 700;
+  line-height: 1;
+}
+
+.step-arrow:hover:not(:disabled) { border-color: var(--primary-color); color: var(--primary-color); }
+.step-arrow:disabled { opacity: .35; cursor: default; }
+
+.step-dots { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.step-dots li { display: flex; }
+
+.step-dot {
+  display: block;
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: var(--primary-color);
+  opacity: .4;
+  transition: width .25s ease, opacity .25s ease;
+}
+
+.step-dot.is-active { width: 26px; opacity: 1; }
+.step-dot.is-locked { border: 1px dashed var(--border-color); background: none; opacity: 1; }
+
+.step-count { color: var(--text-light); font-size: 13px; font-weight: 700; }
+.step-return { margin-left: auto; }
+
+.step-strip {
+  display: flex;
+  align-items: flex-start;
+  overflow-x: auto;
+  /* Held to the height of the page on screen (StepStrip sets it); taller pages
+   * beside it are clipped rather than scrolled. */
+  overflow-y: hidden;
+  transition: height .25s ease;
+  scroll-snap-type: x mandatory;
+  /* A sideways swipe at the first or last page must stop here. Without this a
+   * two-finger swipe on a Mac trackpad, or an edge swipe on iOS, carries on
+   * into the browser's own back gesture and leaves the practice. */
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  border-radius: 12px;
+}
+
+.step-strip::-webkit-scrollbar { display: none; }
+.step-strip:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 4px; }
+
+.step {
+  flex: 0 0 100%;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 0 4px 8px;
+  scroll-snap-align: start;
+  /* One page per swipe, however hard the flick. */
+  scroll-snap-stop: always;
+}
+
+.step-page { display: flex; flex-direction: column; }
+
+/* --- The clip ------------------------------------------------------------ */
+
+.step-clip { margin: 0 0 24px; }
+
+.clip-frame { position: relative; width: min(100%, 480px); }
+
+/* Square, because the clips are. */
 .beat-video {
   display: block;
   width: 100%;
-  max-height: 58vh;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
   border-radius: 12px;
   background: var(--stage);
   box-shadow: var(--shadow-lg);
 }
 
+/* The only way a clip starts. Large and in the middle of the picture. */
+.clip-play {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%, -50%);
+  padding: 1rem 1.8rem;
+  font-size: 1.0625rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--primary-color);
+  color: var(--on-primary);
+  font-weight: 800;
+  box-shadow: var(--shadow-lg);
+}
+
 .stage-actions { display: flex; align-items: center; gap: 16px; margin-top: 10px; }
 
-.transcript { display: flex; flex-direction: column; gap: 18px; margin-bottom: 24px; }
+.step-clip figcaption { margin-top: 16px; }
 
-.utterance { max-width: min(620px, 88%); }
+/* --- What somebody said -------------------------------------------------- *
+ *
+ * Two visual languages share each page and they must never be confused. A line
+ * someone said is a bubble with a name over it; everything the app says *about*
+ * the conversation is the other language — see .coach-surface below. Nothing
+ * here takes a rail, and nothing there takes a bubble.
+ */
 
-.utterance span {
+.said { max-width: min(640px, 96%); margin: 0 0 20px; }
+
+.said-name {
   display: block;
   margin-bottom: 5px;
-  color: var(--text-light);
-  font-size: 12px;
+  color: var(--text-dark);
+  font-size: 13px;
   font-weight: 800;
 }
 
-.utterance p {
+.said p {
   margin: 0;
-  padding: 15px 18px;
-  border: 1px solid var(--border-color);
+  padding: 18px 22px;
+  border: 1px solid var(--said-border);
   border-radius: 4px 18px 18px;
-  background: var(--white);
-  box-shadow: var(--shadow);
+  background: var(--said-bg);
+  font-size: 1.1875rem;
   line-height: 1.5;
+  box-shadow: var(--shadow-lg);
 }
 
-.utterance.you { align-self: flex-end; }
-.utterance.you span { text-align: right; }
+/* Their reaction to what you just said: part of the turn, quieter than the
+ * line it leads into. */
+.said.bridge p { padding: 12px 18px; font-size: 1.0625rem; box-shadow: var(--shadow); }
 
-.utterance.you p {
+/* You already know what you said, so it keeps its colour and gives up the size. */
+.said.you { align-self: flex-end; }
+.said.you .said-name { color: var(--text-light); font-size: 12px; text-align: right; }
+
+.said.you p {
+  padding: 14px 18px;
   border: 0;
   border-radius: 18px 4px 18px 18px;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
   color: var(--on-primary);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  box-shadow: var(--shadow);
+}
+
+/* Said, and not answered yet. Dimmed rather than withheld: it left. */
+.said.is-sending p { opacity: .72; }
+
+/* A page already left: how it went, folded until asked for. */
+.step-outcome > summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.step-outcome > summary::-webkit-details-marker { display: none; }
+.step-outcome > summary .eyebrow { margin: 0; }
+.step-outcome-hint { color: var(--primary-color); font-size: 13px; font-weight: 700; text-decoration: underline; }
+.step-outcome[open] > summary { margin-bottom: 14px; }
+
+/* --- The coaching layer -------------------------------------------------- *
+ *
+ * The other language. Everything the app says about the conversation — the
+ * move to practise, the checks, the box you type into — sits on one tinted
+ * ground behind one rail, full width, with no shadow and no tail. Four
+ * differences at once, so the layers are told apart at a glance and not by
+ * reading them.
+ */
+
+.coach-surface {
+  position: relative;
+  border: 0;
+  border-left: 3px solid var(--primary-color);
+  border-radius: 0 12px 12px 0;
+  background: var(--tint);
+  box-shadow: none;
+  animation: coach-in .26s ease both;
+}
+
+@keyframes coach-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Washes that were picked to sit on white. On the tint they would vanish, so
+ * they take the transcript's ground instead — which is also the one place the
+ * two languages are allowed to borrow from each other. */
+.coach-surface .stronger-reply,
+.coach-surface .check.pending,
+.coach-surface .guide-row { background: var(--white); }
+
+.card-kicker {
+  margin: 0;
+  color: var(--primary-color);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 1.3px;
 }
 
 /* --- Feedback ----------------------------------------------------------- */
 
-.feedback-panel {
-  padding: 2rem;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--white);
-  box-shadow: var(--shadow);
-}
+/* Chrome comes from .coach-surface; only the room inside is this panel's. */
+.feedback-panel { padding: 2rem; }
 
 .scorecard { display: grid; gap: 10px; margin: 0 0 18px; padding: 0; list-style: none; }
 
@@ -432,7 +639,7 @@ button.unit-tile:hover:not(:disabled) {
 
 .feedback-line { margin: 0 0 20px; font-size: 1.25rem; line-height: 1.4; }
 
-.exemplar {
+.stronger-reply {
   margin: 18px 0 6px;
   padding: 20px;
   border-left: 4px solid var(--secondary-color);
@@ -440,22 +647,46 @@ button.unit-tile:hover:not(:disabled) {
   background: var(--tint);
 }
 
-.exemplar blockquote { margin: 8px 0 0; font-size: 1.25rem; line-height: 1.4; }
+.stronger-reply blockquote { margin: 8px 0 0; font-size: 1.25rem; line-height: 1.4; }
+
+/* Nothing was missing, so the model answer is the learner's own sentence. The
+ * rail turns the colour of a check that landed to say so without a word. */
+.stronger-reply.is-your-words { border-left-color: var(--success); }
+
+/* Second voice now, not first: the move to practise is what the learner is
+ * meant to read, and the sample sentence is only there if they get stuck. It
+ * takes the flat ground and the quieter type the instruction used to have. */
+.coaching-example {
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border-radius: 10px;
+  background: var(--bg-light);
+}
+
+.coaching-example blockquote {
+  margin: 6px 0 0;
+  color: var(--text-light);
+  font-size: 14px;
+  line-height: 1.45;
+}
 
 .pending-note { margin: 4px 0 0; color: var(--text-light); font-size: 14px; font-style: italic; }
 .composer-hint { margin: 10px 0 0; color: var(--text-light); font-size: 13px; }
 
 /* --- Composer ----------------------------------------------------------- */
 
-.composer {
-  padding: 18px;
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  background: var(--white);
-  box-shadow: var(--shadow);
-}
+.composer { padding: 18px; }
 
-.composer:focus-within { border-color: var(--primary-color); }
+/* The rail is the composer's whole outline now, so it is what answers focus. */
+.composer:focus-within { border-left-color: var(--secondary-color); }
+
+/* Names the layer without competing with the kicker under it: two indigo
+ * headings a line apart is one heading too many. */
+.composer-kicker {
+  margin: 0 0 12px;
+  color: var(--text-light);
+  letter-spacing: 1.1px;
+}
 
 .composer label { display: block; margin-bottom: 9px; font-size: 13px; font-weight: 800; }
 
@@ -463,13 +694,13 @@ button.unit-tile:hover:not(:disabled) {
 
 /* The checklist the learner composes against. Same three rows, same order and
  * the same marks as .scorecard — one object, seen before and after. */
-.composer-guide {
+.coaching-card {
   margin: -4px 0 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--border-color);
 }
 
-.composer-guide > summary {
+.coaching-card > summary {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -478,21 +709,23 @@ button.unit-tile:hover:not(:disabled) {
   list-style: none;
 }
 
-.composer-guide > summary::-webkit-details-marker { display: none; }
-.composer-guide > summary::after {
+.coaching-card > summary::-webkit-details-marker { display: none; }
+.coaching-card > summary::after {
   margin-left: auto;
   color: var(--text-light);
   font-size: 12px;
   content: '▾ show';
 }
-.composer-guide[open] > summary::after { content: '▴ hide'; }
+.coaching-card[open] > summary::after { content: '▴ hide'; }
 
 .guide-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .guide-chip {
   padding: 3px 9px;
   border-radius: 999px;
-  background: var(--tint);
+  /* var(--white) rather than the tint it used to take: the composer under it
+   * is the tint now, and a chip the colour of its own background is not one. */
+  background: var(--white);
   color: var(--text-light);
   font-size: 12px;
   font-weight: 700;
@@ -502,17 +735,21 @@ button.unit-tile:hover:not(:disabled) {
 .guide-chip.open { background: var(--warn-bg); color: var(--warn); }
 
 /* Open the guide and the chips are redundant with the rows underneath. */
-.composer-guide[open] .guide-chips { display: none; }
+.coaching-card[open] .guide-chips { display: none; }
 
-.composer-guide ul { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.coaching-card ul { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
 
+/* The loudest thing in the card: it carries the rail, the raised ground and
+ * the reading size the example used to wear, so what to do is read before how
+ * someone else said it. */
 .guide-row {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 11px 13px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--secondary-color);
   border-radius: 10px;
-  background: var(--bg-light);
+  background: var(--white);
 }
 
 .guide-row.captured { background: var(--success-bg); }
@@ -523,8 +760,8 @@ button.unit-tile:hover:not(:disabled) {
 .guide-row.open .guide-mark { color: var(--warn); }
 
 .guide-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.guide-body strong { font-size: 14px; }
-.guide-body span { color: var(--text-light); font-size: 14px; line-height: 1.45; }
+.guide-body strong { font-size: 15px; }
+.guide-body span { color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
 .guide-body em { color: var(--primary-color); font-size: 13px; line-height: 1.45; }
 
 /* On a tinted row the indigo drops to ~4.2:1 in dark mode, under AA for 13px.
@@ -543,6 +780,14 @@ button.unit-tile:hover:not(:disabled) {
   resize: vertical;
 }
 
+/* An invisible box on a tinted ground reads as a paragraph, not somewhere to
+ * type. On white it is unmistakably an input again. */
+.composer.coach-surface textarea {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--white);
+}
+
 .composer-actions { display: flex; justify-content: space-between; align-items: center; }
 
 .record-button { border: 0; background: none; color: var(--primary-color); font-weight: 800; }
@@ -554,7 +799,17 @@ button.unit-tile:hover:not(:disabled) {
 
 .recap-panel { text-align: center; }
 
-.level-run { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 26px 0; }
+.level-run {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  justify-content: center;
+  margin: 26px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.level-run li { display: grid; gap: 4px; justify-items: center; }
 
 .level-pip { padding: 6px 12px; border-radius: 20px; font-size: 12px; font-weight: 800; }
 .level-pip.developing { background: var(--warn-bg); color: var(--warn); }
@@ -705,19 +960,25 @@ button.unit-tile:hover:not(:disabled) {
   .recap-panel { margin: 35px auto; }
 
   .practice-layout { display: block; }
-  .practice-side { display: flex; align-items: center; gap: 12px; padding: 12px 0; }
-  .practice-side .eyebrow { display: none; }
+  .practice-side { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 12px 0; }
+  .practice-side .eyebrow, .practice-scene { display: none; }
   .practice-side h2 { margin: 0; font-size: 19px; }
-  .practice-side .muted { margin-left: auto; }
+  .practice-side .muted { order: 3; flex-basis: 100%; margin: 0; }
   /* the recap control must stay reachable on a phone */
-  .practice-side .quiet-button { display: inline; margin-left: 12px; }
-  .practice-panel { padding-top: 18px; }
-  .beat-video { max-height: 42vh; }
+  .practice-side .quiet-button { display: inline; }
+  .practice-top { padding-top: 14px; }
+  .back-to-units { width: 100%; justify-content: center; box-sizing: border-box; }
+  .practice-panel { padding-top: 12px; }
+  .step-count { display: none; }
+  .clip-frame { width: 100%; }
   .composer-actions { gap: 12px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .check { animation: none; opacity: 1; }
   .skeleton-line { animation: none; }
-  .unit-tile, .primary-button, .theme-toggle { transition: none; }
+  /* Page changes jump rather than glide — see StepStrip.tsx. */
+  .coach-surface { animation: none; }
+  .step-dot, .step-strip { transition: none; }
+  .unit-tile, .primary-button, .theme-toggle, .back-to-units, .unit-cover img { transition: none; }
 }
