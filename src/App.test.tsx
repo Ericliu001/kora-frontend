@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
@@ -393,7 +393,7 @@ test("the character's line is in the conversation before the learner replies", a
   expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
 });
 
-test("the character's reaction is part of their next line, not a turn of its own", async () => {
+test("the character's reaction opens their next page, ahead of their line", async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
@@ -401,13 +401,16 @@ test("the character's reaction is part of their next line, not a turn of its own
   await replyWith('Hi Tom, I am Alex.');
   userEvent.click(await screen.findByRole('button', { name: /continue/i }));
 
-  // The bridge answers what the learner actually said; the line after it is
-  // authored. They arrive apart and are spoken as one turn.
-  const spoken = `${TURN_2.bridge} ${TURN_2.line}`;
-  expect(await screen.findByText(spoken)).toBeInTheDocument();
+  // The bridge answers what the learner actually said and the line after it
+  // is authored. They arrive apart and stay apart — on a filmed turn the clip
+  // says the line, and nothing could have filmed the bridge.
+  const page = await screen.findByRole('region', { name: /turn 2 of 3/i });
+  const bridge = within(page).getByText(TURN_2.bridge);
+  const line = within(page).getByText(TURN_2.line);
+  expect(bridge.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
-test('a retry does not log the line to the transcript twice', async () => {
+test('a retry stays on the same page, and the line is said once', async () => {
   mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
@@ -521,7 +524,7 @@ test('what the app says is on a different surface from what anybody said', async
   await reachThePracticeRoom();
 
   const line = await screen.findByText(TURN_1.line);
-  expect(line.closest('.utterance')).toBeInTheDocument();
+  expect(line.closest('.said')).toBeInTheDocument();
   expect(line.closest('.coach-surface')).toBeNull();
 
   expect(screen.getByText(/your turn/i).closest('.coach-surface')).toBeInTheDocument();
@@ -765,4 +768,155 @@ test('moving to the next turn clears the retry guidance', async () => {
 
   expect(await screen.findByText(/what would you say back to tom\?/i)).toBeInTheDocument();
   expect(screen.queryByText(/attempt 2 of 3/i)).not.toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// One page per turn
+// ---------------------------------------------------------------------------
+
+async function reachTurnTwo() {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+  await replyWith('Hi Tom, I am Alex.');
+  userEvent.click(await screen.findByRole('button', { name: /continue/i }));
+  return screen.findByRole('region', { name: /turn 2 of 3/i });
+}
+
+test('each turn is its own page, and a page left behind keeps what you said', async () => {
+  const second = await reachTurnTwo();
+  const first = screen.getByRole('region', { name: /turn 1 of 3/i });
+
+  // The page you left: their line, your reply, how it landed — and nothing to type into.
+  expect(within(first).getByText(TURN_1.line)).toBeInTheDocument();
+  expect(within(first).getByText('Hi Tom, I am Alex.')).toBeInTheDocument();
+  expect(within(first).getByText(/good reply/i)).toBeInTheDocument();
+  expect(within(first).queryByRole('textbox')).not.toBeInTheDocument();
+
+  // The page you are on is the only one that takes a reply.
+  expect(within(second).getByRole('textbox')).toBeInTheDocument();
+  expect(screen.getAllByRole('textbox')).toHaveLength(1);
+});
+
+test('turns not reached yet cannot be jumped to', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  const nav = screen.getByRole('navigation', { name: /turns/i });
+  expect(within(nav).getByRole('button', { name: 'Turn 1' })).toBeInTheDocument();
+  expect(within(nav).queryByRole('button', { name: 'Turn 2' })).not.toBeInTheDocument();
+  expect(within(nav).getByRole('button', { name: /next turn/i })).toBeDisabled();
+  expect(within(nav).getByRole('button', { name: /previous turn/i })).toBeDisabled();
+});
+
+test('going back a page does not move the practice back', async () => {
+  await reachTurnTwo();
+  const nav = screen.getByRole('navigation', { name: /turns/i });
+  expect(within(nav).getByText('Turn 2 of 3')).toBeInTheDocument();
+
+  userEvent.click(within(nav).getByRole('button', { name: /previous turn/i }));
+  expect(within(nav).getByText('Turn 1 of 3')).toBeInTheDocument();
+  // Still turn 2's reply box — looking back is not undoing.
+  expect(screen.getByText(/what would you say back to tom\?/i)).toBeInTheDocument();
+
+  userEvent.click(within(nav).getByRole('button', { name: /back to your turn/i }));
+  expect(within(nav).getByText('Turn 2 of 3')).toBeInTheDocument();
+  expect(within(nav).queryByRole('button', { name: /back to your turn/i })).not.toBeInTheDocument();
+});
+
+test('the arrow keys turn pages, except while you are typing a reply', async () => {
+  await reachTurnTwo();
+  const nav = screen.getByRole('navigation', { name: /turns/i });
+  const strip = screen.getByRole('region', { name: /one turn per page/i });
+
+  fireEvent.keyDown(screen.getByRole('textbox'), { key: 'ArrowLeft' });
+  expect(within(nav).getByText('Turn 2 of 3')).toBeInTheDocument();
+
+  fireEvent.keyDown(strip, { key: 'ArrowLeft' });
+  expect(within(nav).getByText('Turn 1 of 3')).toBeInTheDocument();
+
+  fireEvent.keyDown(strip, { key: 'ArrowRight' });
+  expect(within(nav).getByText('Turn 2 of 3')).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Filmed turns
+// ---------------------------------------------------------------------------
+
+const FILMED = {
+  ...PRACTICE,
+  turn: {
+    ...TURN_1,
+    videoUrl: 'https://media.example/units/start-a-conversation/video/starting-chat-1/video.mp4',
+    posterUrl: 'https://media.example/units/start-a-conversation/image/image.jpg',
+    durationSeconds: 10,
+  },
+};
+
+test('a filmed turn waits for Play, and never starts by itself', async () => {
+  const play = jest.spyOn(HTMLMediaElement.prototype, 'play');
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+
+  const video = document.querySelector('video')!;
+  expect(video).toHaveAttribute('src', FILMED.turn.videoUrl);
+  expect(video).toHaveAttribute('poster', FILMED.turn.posterUrl);
+  expect(play).not.toHaveBeenCalled();
+  // Nobody is talking until the learner asks them to.
+  expect(screen.queryByText(/is still talking/i)).not.toBeInTheDocument();
+
+  userEvent.click(screen.getByRole('button', { name: /play tom/i }));
+  expect(play).toHaveBeenCalledTimes(1);
+
+  fireEvent.play(video);
+  expect(screen.queryByRole('button', { name: /play tom/i })).not.toBeInTheDocument();
+  expect(screen.getByText(/tom is still talking/i)).toBeInTheDocument();
+
+  fireEvent.ended(video);
+  expect(screen.getByRole('button', { name: /play again/i })).toBeInTheDocument();
+  expect(screen.queryByText(/is still talking/i)).not.toBeInTheDocument();
+});
+
+test('the words of a filmed turn are one click away', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+
+  expect(screen.queryByText(TURN_1.line)).not.toBeInTheDocument();
+
+  const toggle = screen.getByRole('button', { name: /show the words/i });
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  userEvent.click(toggle);
+  expect(screen.getByText(TURN_1.line)).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole('button', { name: /hide the words/i }));
+  expect(screen.queryByText(TURN_1.line)).not.toBeInTheDocument();
+});
+
+test('a clip that will not load leaves the words, not a hole', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+
+  fireEvent.error(document.querySelector('video')!);
+  expect(await screen.findByText(TURN_1.line)).toBeInTheDocument();
+  expect(document.querySelector('video')).toBeNull();
+  expect(screen.queryByRole('button', { name: /play tom/i })).not.toBeInTheDocument();
+});
+
+test('the way back to all units is the first thing on the practice page', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  // The footer has an "All units" link too; this one is the practice page's own.
+  const main = document.querySelector('main')!;
+  const back = within(main).getByRole('link', { name: /all units/i });
+  expect(back).toHaveAttribute('href', '/');
+  expect(within(main).getAllByRole('link')[0]).toBe(back);
+
+  userEvent.click(back);
+  expect(await screen.findByRole('button', { name: /start a conversation/i })).toBeInTheDocument();
 });

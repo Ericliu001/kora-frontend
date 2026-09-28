@@ -1,11 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import BeatStage from '../components/BeatStage';
-import Composer from '../components/Composer';
 import ErrorNotice from '../components/ErrorNotice';
-import FeedbackPanel from '../components/FeedbackPanel';
-import ReflectionPending from '../components/ReflectionPending';
-import Utterance from '../components/Utterance';
+import StepStrip from '../components/StepStrip';
 import { AppError, isPageLevel } from '../errors';
 import { Practising } from '../hooks/usePractice';
 import { UnitSummary } from '../types';
@@ -33,7 +29,7 @@ function PracticeSkeleton() {
 }
 
 /**
- * The practice room: the conversation so far, and your turn.
+ * The practice room: one page per turn, side by side, and your turn on the last.
  *
  * The unit comes from the URL, so a pasted link starts a practice with no click
  * — the same [start] the tile calls, from the other direction.
@@ -52,36 +48,18 @@ export default function PracticeScreen({
     unitId,
     unitTitle,
     userGoal,
-    turnCount,
+    scene,
     turn,
-    coaching,
-    utterances,
-    hasClip,
-    reflection,
-    lastReply,
-    busy,
+    hasReplied,
     isLoading,
     error,
-    videoRef,
     start,
     finish,
-    continueAfterFeedback,
-    markClipWatched,
-    markClipUnavailable,
   } = practice;
 
   // One attempt per unit. Without this, a 404 would set an error, re-render,
   // and start the same doomed request again.
   const attempted = useRef<string | null>(null);
-
-  // How much of the conversation was already on screen last time round. A line
-  // past this mark has just landed, and is the only one allowed to type itself
-  // out — coming back to a finished practice should not replay it.
-  const seen = useRef(utterances.length);
-  useEffect(() => {
-    seen.current = utterances.length;
-  }, [utterances.length]);
-  const firstNew = seen.current;
 
   const known = routeUnitId ? findUnit(routeUnitId) : undefined;
   const notReady = !!known && !known.playable;
@@ -113,64 +91,25 @@ export default function PracticeScreen({
 
   return (
     <section className="practice-layout">
+      {/* First on the page and first in the tab order: leaving is always one
+          obvious click away, on a phone as much as on a desktop. */}
+      <nav className="practice-top" aria-label="Practice">
+        <Link className="back-to-units" to="/">
+          <span aria-hidden="true">←</span> All units
+        </Link>
+      </nav>
       <aside className="practice-side">
         <p className="eyebrow">PRACTISING</p>
         <h2>{unitTitle}</h2>
         {userGoal && <p className="muted small">{userGoal}</p>}
-        <p className="muted small">
-          Turn {turn.turnNumber} of {turnCount}
-        </p>
-        <button
-          className="quiet-button"
-          onClick={finish}
-          disabled={isLoading || utterances.every((line) => line.speaker === 'THEM')}
-        >
+        {scene && <p className="muted small practice-scene">{scene}</p>}
+        <button className="quiet-button" onClick={finish} disabled={isLoading || !hasReplied}>
           Finish &amp; see recap
         </button>
-        <Link className="quiet-button" to="/">
-          ← All units
-        </Link>
       </aside>
 
       <div className="practice-panel">
-        {hasClip && (
-          <BeatStage
-            turn={turn}
-            videoRef={videoRef}
-            onEnded={markClipWatched}
-            onUnavailable={markClipUnavailable}
-          />
-        )}
-
-        {utterances.length > 0 && (
-          <div className="transcript" aria-live="polite">
-            {utterances.map((line, index) => (
-              <Utterance
-                key={`${line.speaker}-${index}`}
-                line={line}
-                justArrived={index >= firstNew}
-                // Your reply is on screen before the server has read it. Dimmed
-                // rather than withheld: it was said, it is just not answered yet.
-                isSending={
-                  busy === 'assessing' && line.speaker === 'YOU' && index === utterances.length - 1
-                }
-              />
-            ))}
-          </div>
-        )}
-
-        {busy === 'assessing' ? (
-          <ReflectionPending coaching={coaching} />
-        ) : reflection ? (
-          <FeedbackPanel
-            reflection={reflection}
-            yourReply={lastReply}
-            onContinue={continueAfterFeedback}
-            isLoading={isLoading}
-          />
-        ) : (
-          <Composer practice={practice} />
-        )}
+        <StepStrip practice={practice} />
       </div>
     </section>
   );

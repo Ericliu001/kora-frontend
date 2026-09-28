@@ -56,6 +56,8 @@ export interface Practice {
   unitId: string;
   unitTitle: string;
   userGoal: string;
+  /** Where the conversation happens. Absent on a server older than the step pages. */
+  scene?: string | null;
   turnCount: number;
   turn: Turn;
 }
@@ -65,7 +67,8 @@ export interface Practice {
  *
  * `bridge` is their reaction to what you just said and `line` is the authored
  * continuation; they arrive separately because only the second one is fixed.
- * `videoUrl` is absent on a written turn, which today is every turn.
+ * On a filmed turn the clip speaks `line` word for word, and `bridge` — written
+ * live, after your reply — stays text. `videoUrl` is absent on a written turn.
  */
 export interface Turn {
   id: string;
@@ -138,11 +141,18 @@ export interface Recap {
   suggestedLine: string;
 }
 
-/** What the learner sees scrolling up the practice room. */
-export interface Utterance {
-  speaker: 'THEM' | 'YOU';
-  name: string;
-  text: string;
+/**
+ * One page of the practice: a turn, and — once the learner has moved past it —
+ * how it went.
+ *
+ * `outcome` is the attempt the learner continued from, kept so a finished page
+ * still shows what they said and how it landed when they swipe back to it. The
+ * page being worked on has no outcome yet; its draft, attempt and feedback live
+ * in `usePractice` alongside it.
+ */
+export interface Step {
+  turn: Turn;
+  outcome?: { reply: string; reflection: Reflection };
 }
 
 /**
@@ -159,10 +169,6 @@ export const LEVEL_LABEL: Record<Level, string> = {
   BETTER: 'Good reply',
   BEST: 'Strong reply',
 };
-
-/** The character's turn as one utterance: their reaction, then their line. */
-export const spokenTurn = (turn: Turn): string =>
-  [turn.bridge, turn.line].filter(Boolean).join(' ');
 
 /**
  * What a second attempt is allowed to remember.

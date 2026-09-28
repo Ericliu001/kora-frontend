@@ -26,7 +26,7 @@ npm start
 
 That serves the app on `http://localhost:3000` and expects the API on
 `http://localhost:8080`, so the backend has to be running too. From the parent
-repository, `./dev` starts both in one terminal, installs these packages on first
+repository, `./launch` starts both in one terminal, installs these packages on first
 run and passes the API base URL through — the usual way in.
 
 Point the app at a deployed API instead by setting the one environment variable
@@ -68,7 +68,7 @@ The layering rule underneath that is worth keeping:
 | [src/index.tsx](src/index.tsx) | Entry point: root, router, strict mode |
 | [src/App.tsx](src/App.tsx) | The shell: chrome, routes, the one practice |
 | [src/screens/HomeScreen.tsx](src/screens/HomeScreen.tsx) | The map: hero, three module sections, unit tiles, loading skeleton |
-| [src/screens/PracticeScreen.tsx](src/screens/PracticeScreen.tsx) | The practice room: transcript, feedback or composer, the URL-driven start |
+| [src/screens/PracticeScreen.tsx](src/screens/PracticeScreen.tsx) | The practice room: the unit beside a row of turn pages, the URL-driven start |
 | [src/screens/RecapScreen.tsx](src/screens/RecapScreen.tsx) | The recap, turn by turn, and one line worth keeping |
 | [src/hooks/usePractice.ts](src/hooks/usePractice.ts) | One practice from first line to recap — the real state machine |
 | [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) | The whole curriculum in one request, plus `findUnit` and a reload |
@@ -84,9 +84,36 @@ The components: `SiteHeader` and `SiteFooter` (chrome, and the theme toggle),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
 (the move to practise), `ReflectionScorecard` and `FeedbackPanel` (the three
 checks and what to take away), `ReflectionPending` (the same shape while the
-server is judging), `Utterance` (one line of the conversation), `ErrorNotice`
-(every error a person sees, in three shapes), and `BeatStage`, a video player
-that never renders today — see [Media](#media).
+server is judging), `ErrorNotice` (every error a person sees, in three shapes),
+and the practice itself — see [One page per turn](#one-page-per-turn):
+`StepStrip` (the sideways row of pages and its nav), `StepPage` (one turn),
+`StepClip` (a filmed turn's clip, its Play button and its words toggle) and
+`Said` (anything a person said). The way out, **← All units**, is the first
+thing on the practice page, above everything else, at every width.
+
+## One page per turn
+
+A practice is a row of pages, one per turn reached, side by side in a
+horizontal scroller that snaps a page at a time. The browser does the swiping —
+touch, trackpad and scroll wheel all work with nothing listening for gestures —
+and the nav above the row adds ← → buttons, one dot per turn and the arrow keys
+(ignored while typing in the reply box). `overscroll-behavior-x: contain` stops
+a swipe at either end from turning into the browser's own back gesture.
+
+Each page, top to bottom: the character's reaction to your last reply (a later
+turn only), their line — the clip on a filmed turn, the words on a written one —
+and then either the composer and feedback, on the turn being worked on, or, on a
+page already left, the reply you moved on with and a folded "how it landed".
+
+Pages exist only up to the turn being worked on: there is nothing ahead of it
+until you have replied, so later dots are placeholders. **Looking is not
+moving.** `usePractice` holds `steps` — each turn reached, and the outcome of the
+ones left behind — and the turn being worked on is always the last step. Which
+page is on screen belongs to `StepStrip` and is read back from the scroll
+position, so swiping back to turn 1 never changes where the practice is.
+
+The row is held to the height of the page on screen, not its tallest page, so a
+short finished page does not sit above a screen of nothing.
 
 ## Routes
 
@@ -150,19 +177,27 @@ is shown:
 
 A 5xx keeps the server's message off screen — at that status it can be a stack
 detail, and fixed copy is what a person should read; the detail goes to
-`console.warn` instead. A reply that fails to send rolls the conversation back
-exactly as it was, draft included.
+`console.warn` instead. A reply that fails to send comes back off the page and
+into the box, draft included.
 
 ## Media
 
-**There is no media.** Every unit is written, every turn is text, and no turn
-carries a `videoUrl`. `BeatStage` and the `hasClip` branches around it exist
-because a clip is one of two normal cases rather than a fallback — the day a turn
-is filmed, the data can carry it and nothing else in the loop changes — but that
-component never renders today. Nothing here plays a clip, shows captions or
-fetches from a CDN, and the unit covers are CSS gradients, not images.
+A filmed turn arrives with `videoUrl` and `posterUrl` — absolute URLs the
+backend builds from bucket paths and `MEDIA_BASE_URL` — and `StepClip` plays it.
+The clip speaks the authored `line` word for word; the bridge before it is
+written live after your reply, so it stays text. Units without clips work
+exactly as before: the line is shown as words.
 
-Voice is the one media thing that is real.
+`StepClip` never starts a clip by itself. It shows the poster — the unit still,
+which is the clip's own first frame — under one large **Play** button, which
+comes back as Resume or Play again whenever the clip is paused or has ended;
+scrolling the page away pauses it. A **Show the words** toggle under every clip
+reveals the line as text. If the clip will not load, the words are shown
+instead, so a broken video costs the video and nothing else. While a clip plays
+the composer says "still talking — reply whenever you're ready"; replying is
+never blocked, and speaking pauses the clip.
+
+Voice input:
 [useVoiceInput](src/hooks/useVoiceInput.ts) records with `MediaRecorder`, uploads
 the blob as `FormData` to `/practices/:id/transcribe`, and puts the transcript
 into the draft, where the learner can edit it before sending. Support is decided
@@ -180,7 +215,7 @@ one attribute on `<html>`, set by `useTheme`, with no component re-rendering.
 If you add a colour, add a token. A hex baked into a rule is a light-mode colour
 that survives the theme switch and breaks dark mode. The only rules that name a
 colour directly are the ones whose surface is dark in both themes — the hero
-gradient, the footer overlay and the speaker avatar — and they are exceptions,
+gradient and the footer overlay — and they are exceptions,
 not a precedent.
 
 A few wash values (`--success-bg`, `--warn-bg`, `--tint` in dark) look like odd
@@ -200,21 +235,22 @@ fingerprints it too.
 - A preview unit is plain content, not a `disabled` button. A disabled button
   leaves the tab order, so a screen reader user tabbing the grid would never
   learn those units exist — and being read is the whole job of a roadmap.
-- The transcript is an `aria-live="polite"` region, and a line's text is in the
-  DOM throughout its typing animation — hidden with opacity, never unmounted.
+- Each page is a labelled region ("Turn 2 of 4"), the current dot carries
+  `aria-current="step"`, and the "Turn N of M" counter is `aria-live="polite"`,
+  so moving between pages is announced.
 - Banner and inline errors are `role="alert"`. A page-level error is not: it
   takes focus on its heading instead, so it is read as a heading rather than
   shouted over whatever the person was doing.
-- `prefers-reduced-motion` is honoured in CSS *and* in JS — `Utterance` skips the
-  typing pause rather than merely hiding it.
+- `prefers-reduced-motion` is honoured in CSS *and* in JS — `StepStrip` jumps
+  between pages instead of gliding.
 - Waiting states announce themselves through `role="status"`.
 
 ## Testing
 
-One test file, [src/App.test.tsx](src/App.test.tsx): 34 tests that render the
+One test file, [src/App.test.tsx](src/App.test.tsx): 42 tests that render the
 real `App` under a `MemoryRouter` against a stubbed `global.fetch`, grouped as
-the curriculum, getting into a practice, arriving by URL, the conversation and
-the coaching. Nothing is shallow-rendered and no hook is tested alone — the tests
+the curriculum, getting into a practice, arriving by URL, the conversation,
+the coaching, one page per turn and filmed turns. Nothing is shallow-rendered and no hook is tested alone — the tests
 click tiles, type replies and read the page, which is why they survived this app
 being split into screens, hooks and components.
 
@@ -224,8 +260,9 @@ parent repository's `data/units/start-a-conversation/dialog.json`.
 [src/setupTests.ts](src/setupTests.ts) fills the jsdom gaps those tests need:
 jest-dom's matchers; a stub `MediaRecorder` and `navigator.mediaDevices`, so
 feature detection says "recording works" by default and the tests that care about
-the other case take them away deliberately; and a `matchMedia` answering "no
-preference", so tests do not all run as a visitor who asked for no motion.
+the other case take them away deliberately; a `matchMedia` answering "no
+preference", so tests do not all run as a visitor who asked for no motion; and
+`play()`/`pause()` on media elements, which jsdom does not implement.
 
 ## Where to read more
 

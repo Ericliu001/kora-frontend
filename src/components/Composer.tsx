@@ -23,8 +23,7 @@ export default function Composer({ practice }: { practice: Practising }) {
     setDraft,
     isLoading,
     busy,
-    hasClip,
-    clipWatched,
+    clipPlaying,
     voice,
     composerError,
     clearComposerError,
@@ -34,7 +33,7 @@ export default function Composer({ practice }: { practice: Practising }) {
   if (!turn) return null;
 
   const canRespond = !isLoading;
-  const stillTalking = hasClip && !clipWatched;
+  const stillTalking = clipPlaying;
 
   const stillOpen = carriedCriteria?.filter((criterion) => !criterion.captured) ?? [];
   const label =

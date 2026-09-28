@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { request } from '../api';
 import { AppError, isRetryable, toAppError } from '../errors';
@@ -9,9 +9,7 @@ import {
   Practice,
   Recap,
   Reflection,
-  spokenTurn,
-  Turn,
-  Utterance,
+  Step,
 } from '../types';
 import { useVoiceInput } from './useVoiceInput';
 
@@ -19,9 +17,14 @@ import { useVoiceInput } from './useVoiceInput';
  * One practice, from the first line to the recap.
  *
  * Everything here is one conversation's worth of state, which is why it is one
- * hook rather than several: the transcript, the turn, the draft and the
- * feedback all change together, and splitting them would mean keeping them in
- * step by hand.
+ * hook rather than several: the steps, the draft and the feedback all change
+ * together, and splitting them would mean keeping them in step by hand.
+ *
+ * The practice is a list of steps, one per turn reached. The last step is the
+ * one being worked on — its draft, attempt number and feedback are the loose
+ * state below — and every step before it carries the outcome it was left with.
+ * Which step is on screen is not here: that is the view's business, and
+ * swiping back to an old page must never change where the practice is.
  *
  * Called once, at the top of the app, and handed down. Two screens read it;
  * that is not enough consumers to justify a context.
@@ -32,16 +35,17 @@ export function usePractice() {
   const [unitId, setUnitId] = useState<string | null>(null);
   const [unitTitle, setUnitTitle] = useState('');
   const [userGoal, setUserGoal] = useState('');
+  const [scene, setScene] = useState('');
   const [turnCount, setTurnCount] = useState(0);
   const [practiceId, setPracticeId] = useState<string | null>(null);
   // Which tile is waiting on the server. Held here rather than in the grid so
   // the spinner belongs to the practice being created, not to a component that
   // is about to unmount.
   const [startingId, setStartingId] = useState<string | null>(null);
-  const [turn, setTurn] = useState<Turn | null>(null);
-  const [utterances, setUtterances] = useState<Utterance[]>([]);
-  const [clipWatched, setClipWatched] = useState(false);
-  const [videoFailed, setVideoFailed] = useState(false);
+  const [steps, setSteps] = useState<Step[]>([]);
+  // The current turn's clip is playing right now. Clips never start by
+  // themselves, so this is false until the learner presses Play.
+  const [clipPlaying, setClipPlaying] = useState(false);
   const [draft, setDraft] = useState('');
   // The reply now being judged. Kept because a reply that lands all three
   // checks is shown its own words back as the model — see FeedbackPanel.
@@ -65,11 +69,9 @@ export function usePractice() {
   const [error, setError] = useState<AppError | null>(null);
   const [composerError, setComposerError] = useState<AppError | null>(null);
 
+  // The clip on the step being worked on. Older steps keep their own elements;
+  // only this one has to be stoppable when the learner starts to speak.
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  // Which turns have already had their line written into the transcript. A ref,
-  // not state, because a retry must not log the line a second time and this
-  // must survive Strict Mode's double effect without causing another render.
-  const loggedRef = useRef<Set<string>>(new Set());
   // Lets a failed request offer itself back as a retry without any of these
   // callbacks having to name itself inside its own body.
   const ops = useRef<{
@@ -101,39 +103,8 @@ export function usePractice() {
       ? 'transcribing'
       : null;
 
-  /** Put their line in the transcript. Once per turn, whenever it first belongs there. */
-  const revealTheirLine = useCallback((current: Turn) => {
-    if (loggedRef.current.has(current.id)) return;
-    loggedRef.current.add(current.id);
-    setUtterances((all) => [
-      ...all,
-      { speaker: 'THEM', name: current.speaker, text: spokenTurn(current) },
-    ]);
-  }, []);
-
-  /**
-   * Move a finished turn into the transcript. On a filmed turn the line has not
-   * been written down yet, so it goes in just ahead of the reply.
-   */
-  const logReply = useCallback((current: Turn, reply: string) => {
-    setUtterances((all) => {
-      const theirs = loggedRef.current.has(current.id)
-        ? []
-        : [{ speaker: 'THEM' as const, name: current.speaker, text: spokenTurn(current) }];
-      loggedRef.current.add(current.id);
-      return [...all, ...theirs, { speaker: 'YOU' as const, name: 'You', text: reply }];
-    });
-  }, []);
-
-  // No clip to watch — the words go straight into the conversation. Today that
-  // is every turn; a filmed one holds its line back until the clip has played.
-  const hasClip = !!turn?.videoUrl && !videoFailed;
-  useEffect(() => {
-    if (turn && !hasClip) {
-      setClipWatched(true);
-      revealTheirLine(turn);
-    }
-  }, [turn, hasClip, revealTheirLine]);
+  /** The turn being worked on: always the last step's. */
+  const turn = steps.length > 0 ? steps[steps.length - 1].turn : null;
 
   /**
    * Begin a unit. One entry point, two callers: a click on a tile, and a
@@ -153,22 +124,21 @@ export function usePractice() {
           method: 'POST',
           body: JSON.stringify({ unitId: id }),
         });
-        loggedRef.current = new Set();
         setPracticeId(practice.id);
         setUnitId(practice.unitId);
         setUnitTitle(practice.unitTitle);
         setUserGoal(practice.userGoal);
+        setScene(practice.scene ?? '');
         setTurnCount(practice.turnCount);
-        setUtterances([]);
         setReflection(null);
         setRecap(null);
         setCarried(null);
         setComposerError(null);
         setAttemptNumber(1);
         setDraft('');
-        setVideoFailed(false);
-        setClipWatched(!practice.turn.videoUrl);
-        setTurn(practice.turn);
+        setLastReply('');
+        setClipPlaying(false);
+        setSteps([{ turn: practice.turn }]);
         // Last, so the route guard sees a practice in flight when it renders.
         navigate(`/units/${practice.unitId}`);
       } catch (reason) {
@@ -209,9 +179,6 @@ export function usePractice() {
 
     // Show the reply landing straight away and wait underneath it, rather than
     // leaving the learner staring at their own unsent draft.
-    const previousUtterances = utterances;
-    const theirLineWasLogged = loggedRef.current.has(turn.id);
-    logReply(turn, text);
     setLastReply(text);
     setDraft('');
     setIsBusy(true);
@@ -227,11 +194,8 @@ export function usePractice() {
         }),
       );
     } catch (reason) {
-      // Put the conversation back exactly as it was, draft included. Captured
-      // from the closure on purpose: the updater form would restore the
-      // optimistic value, which is the thing we are undoing.
-      setUtterances(previousUtterances);
-      if (!theirLineWasLogged) loggedRef.current.delete(turn.id);
+      // Take the reply back off the page and put it back in the box.
+      setLastReply('');
       setDraft(text);
 
       const failure = toAppError(reason, 'Unable to send your reply.');
@@ -244,7 +208,7 @@ export function usePractice() {
       setAssessing(false);
       setIsBusy(false);
     }
-  }, [draft, practiceId, turn, isLoading, utterances, logReply, stopThemTalking]);
+  }, [draft, practiceId, turn, isLoading, stopThemTalking]);
 
   const continueAfterFeedback = useCallback(async () => {
     if (!reflection) return;
@@ -258,27 +222,34 @@ export function usePractice() {
       setReflection(null);
       return;
     }
-    if (reflection.nextTurn) {
-      const next = reflection.nextTurn;
+    // Moving on: the page being left keeps the attempt it was left with, so
+    // swiping back to it shows what was said and how it landed.
+    const outcome = { reply: lastReply, reflection };
+    const next = reflection.nextTurn;
+    setSteps((all) => [
+      ...all.slice(0, -1),
+      { ...all[all.length - 1], outcome },
+      ...(next ? [{ turn: next }] : []),
+    ]);
+    if (next) {
       setReflection(null);
       setCarried(null);
       setAttemptNumber(1);
-      setVideoFailed(false);
-      setClipWatched(!next.videoUrl);
-      setTurn(next);
+      setLastReply('');
+      setClipPlaying(false);
       return;
     }
     await finish();
-  }, [reflection, finish]);
+  }, [reflection, lastReply, finish]);
 
   const restart = useCallback(() => {
     setUnitId(null);
     setUnitTitle('');
     setUserGoal('');
+    setScene('');
     setTurnCount(0);
     setPracticeId(null);
-    setTurn(null);
-    setUtterances([]);
+    setSteps([]);
     setReflection(null);
     setCarried(null);
     setAttemptNumber(1);
@@ -288,7 +259,6 @@ export function usePractice() {
     setError(null);
     setComposerError(null);
     setAssessing(false);
-    loggedRef.current = new Set();
     navigate('/');
   }, [navigate]);
 
@@ -301,14 +271,16 @@ export function usePractice() {
     unitId,
     unitTitle,
     userGoal,
+    scene,
     turnCount,
     startingId,
     practiceId,
+    steps,
     turn,
     coaching,
-    utterances,
-    hasClip,
-    clipWatched,
+    /** Something has been said back, so there is something to recap. */
+    hasReplied: steps.some((step) => !!step.outcome) || !!reflection,
+    clipPlaying,
     draft,
     setDraft,
     lastReply,
@@ -329,8 +301,7 @@ export function usePractice() {
     continueAfterFeedback,
     finish,
     restart,
-    markClipWatched: useCallback(() => setClipWatched(true), []),
-    markClipUnavailable: useCallback(() => setVideoFailed(true), []),
+    markClipPlaying: setClipPlaying,
   };
 }
 
