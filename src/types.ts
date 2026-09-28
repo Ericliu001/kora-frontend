@@ -33,6 +33,8 @@ export interface UnitSummary {
   skill: string;
   estimatedMinutes: number;
   turnCount?: number | null;
+  /** The unit still, once the unit is filmed. Without one the tile draws its own cover. */
+  coverUrl?: string | null;
 }
 
 /**

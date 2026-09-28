@@ -1,16 +1,28 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { UnitSummary } from '../types';
 
 /**
  * The cover.
  *
- * No unit has footage yet, and generating thirty-four placeholder images to
- * fill a grid would be thirty-four files to delete later. A gradient and the
- * unit's own number does the same job: tiles that differ from each other at a
- * glance, and nothing to throw away when a real still arrives.
+ * A filmed unit shows its still — the frame every one of its clips starts on,
+ * so the face on the tile is the face you are about to talk to. Every other
+ * unit, and any still that fails to load, gets a gradient and the unit's own
+ * number instead: tiles that differ at a glance, and nothing to throw away when
+ * a real still arrives.
+ *
+ * The image is decoration beside a title that already says what the unit is,
+ * so it has empty alt text rather than a description to read out.
  */
-function UnitCover({ index }: { index: number }) {
-  return <span className="unit-cover is-generated" data-index={index} aria-hidden="true" />;
+function UnitCover({ index, coverUrl }: { index: number; coverUrl?: string | null }) {
+  const [failed, setFailed] = useState(false);
+  if (!coverUrl || failed) {
+    return <span className="unit-cover is-generated" data-index={index} aria-hidden="true" />;
+  }
+  return (
+    <span className="unit-cover" aria-hidden="true">
+      <img src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+    </span>
+  );
 }
 
 export default function UnitTile({
@@ -39,7 +51,7 @@ export default function UnitTile({
 
   const body = (
     <>
-      <UnitCover index={index} />
+      <UnitCover index={index} coverUrl={unit.coverUrl} />
       <span className="unit-body">
         <span className="card-kicker">
           UNIT {index}

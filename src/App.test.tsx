@@ -267,13 +267,41 @@ test('a preview says what it will teach and how long it takes', async () => {
   expect(locked).toHaveTextContent(/about 5 min/i);
 });
 
-test('every tile gets a cover, because no unit has been filmed', async () => {
+test('every tile gets a cover: a drawn one until the unit is filmed', async () => {
   mockBackend();
   const { container } = renderApp();
   await tile();
 
   expect(container.querySelectorAll('.unit-cover img')).toHaveLength(0);
   expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(5);
+});
+
+const COVER = 'https://media.example/units/start-a-conversation/image/image.jpg';
+const FILMED_CATALOG = [
+  { ...CATALOG[0], units: [{ ...BUILT_UNIT, coverUrl: COVER }, ...CATALOG[0].units.slice(1)] },
+  ...CATALOG.slice(1),
+];
+
+test('a filmed unit shows its still on the tile', async () => {
+  mockBackend({ '/catalog': FILMED_CATALOG });
+  const { container } = renderApp();
+  const button = await tile();
+
+  const cover = button.querySelector('.unit-cover img');
+  expect(cover).toHaveAttribute('src', COVER);
+  // Decoration beside a title that already names the unit.
+  expect(cover).toHaveAttribute('alt', '');
+  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(4);
+});
+
+test('a still that will not load falls back to the drawn cover', async () => {
+  mockBackend({ '/catalog': FILMED_CATALOG });
+  renderApp();
+  const button = await tile();
+
+  fireEvent.error(button.querySelector('.unit-cover img')!);
+  expect(button.querySelector('.unit-cover img')).toBeNull();
+  expect(button.querySelector('.unit-cover.is-generated')).toBeInTheDocument();
 });
 
 // ---------------------------------------------------------------------------

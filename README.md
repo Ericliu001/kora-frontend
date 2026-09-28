@@ -80,7 +80,9 @@ The layering rule underneath that is worth keeping:
 | [src/types.ts](src/types.ts) | Wire types, mirrored by hand from the Kotlin |
 
 The components: `SiteHeader` and `SiteFooter` (chrome, and the theme toggle),
-`UnitTile` (one unit on the map, or a preview that is deliberately not a button),
+`UnitTile` (one unit on the map, or a preview that is deliberately not a button;
+its cover is the unit still when the catalogue sends a `coverUrl`, and a drawn
+gradient with the unit's number otherwise, or if the still fails to load),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
 (the move to practise), `ReflectionScorecard` and `FeedbackPanel` (the three
 checks and what to take away), `ReflectionPending` (the same shape while the

@@ -208,6 +208,16 @@ button.unit-tile:hover:not(:disabled) {
 }
 
 
+.unit-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform .4s ease;
+}
+
+button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); }
+
 /* No footage yet. A gradient and the unit's own number tell tiles apart
  * without twenty placeholder files to delete later. */
 .unit-cover.is-generated {
@@ -970,5 +980,5 @@ button.unit-tile:hover:not(:disabled) {
   /* Page changes jump rather than glide — see StepStrip.tsx. */
   .coach-surface { animation: none; }
   .step-dot, .step-strip { transition: none; }
-  .unit-tile, .primary-button, .theme-toggle, .back-to-units { transition: none; }
+  .unit-tile, .primary-button, .theme-toggle, .back-to-units, .unit-cover img { transition: none; }
 }
