@@ -13,14 +13,34 @@ import { UnitSummary } from '../types';
  * The image is decoration beside a title that already says what the unit is,
  * so it has empty alt text rather than a description to read out.
  */
-function UnitCover({ index, coverUrl }: { index: number; coverUrl?: string | null }) {
+function UnitCover({
+  index,
+  coverUrl,
+  coverUrl2x,
+}: {
+  index: number;
+  coverUrl?: string | null;
+  coverUrl2x?: string | null;
+}) {
   const [failed, setFailed] = useState(false);
   if (!coverUrl || failed) {
     return <span className="unit-cover is-generated" data-index={index} aria-hidden="true" />;
   }
   return (
     <span className="unit-cover" aria-hidden="true">
-      <img src={coverUrl} alt="" loading="lazy" decoding="async" onError={() => setFailed(true)} />
+      <img
+        src={coverUrl}
+        // Two widths of the same still. The browser picks by how wide the tile
+        // is drawn and how dense the screen is; `sizes` tells it the first of
+        // those before the stylesheet has. Mirrors COVER_WIDTH and
+        // COVER_WIDTH_2X in backend/.../gym/Media.kt.
+        srcSet={coverUrl2x ? `${coverUrl} 384w, ${coverUrl2x} 768w` : undefined}
+        sizes={coverUrl2x ? '(max-width: 600px) 100vw, 320px' : undefined}
+        alt=""
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+      />
     </span>
   );
 }
@@ -51,7 +71,7 @@ export default function UnitTile({
 
   const body = (
     <>
-      <UnitCover index={index} coverUrl={unit.coverUrl} />
+      <UnitCover index={index} coverUrl={unit.coverUrl} coverUrl2x={unit.coverUrl2x} />
       <span className="unit-body">
         <span className="card-kicker">
           UNIT {index}

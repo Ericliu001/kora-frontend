@@ -81,7 +81,8 @@ The layering rule underneath that is worth keeping:
 
 The components: `SiteHeader` and `SiteFooter` (chrome, and the theme toggle),
 `UnitTile` (one unit on the map, or a preview that is deliberately not a button;
-its cover is the unit still when the catalogue sends a `coverUrl`, and a drawn
+its cover is the unit still when the catalogue sends a `coverUrl`, offered at
+two widths through `srcSet` when it also sends a `coverUrl2x`, and a drawn
 gradient with the unit's number otherwise, or if the still fails to load),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
 (the move to practise), `ReflectionScorecard` and `FeedbackPanel` (the three
@@ -148,8 +149,10 @@ Client-side routing needs the host to serve `index.html` for every path.
 
 Every request goes through one function, `request<T>()` in
 [src/api.ts](src/api.ts). The base URL is `REACT_APP_API_BASE_URL`, defaulting to
-`http://localhost:8080/api`. It sets JSON headers for normal requests, leaves
-`FormData` untouched so audio uploads keep their own boundary, and times
+`http://localhost:8080/api`. It sets the JSON `Content-Type` only on a request
+with a JSON body — on a request with no body, such as the catalogue, that header
+would make the browser send an `OPTIONS` preflight first — leaves `FormData`
+untouched so audio uploads keep their own boundary, and times
 everything out after 10 seconds — 45 for the two calls that wait on a model,
 `/reflections` and `/transcribe`.
 

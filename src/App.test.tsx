@@ -276,9 +276,19 @@ test('every tile gets a cover: a drawn one until the unit is filmed', async () =
   expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(5);
 });
 
-const COVER = 'https://media.example/units/start-a-conversation/image/image.jpg';
+const STILL = 'units/start-a-conversation/image/image.jpg';
+const resized = (width: number) =>
+  `https://media.example/cdn-cgi/image/width=${width},quality=75,format=auto,onerror=redirect/${STILL}`;
+const COVER = resized(384);
+const COVER_2X = resized(768);
 const FILMED_CATALOG = [
-  { ...CATALOG[0], units: [{ ...BUILT_UNIT, coverUrl: COVER }, ...CATALOG[0].units.slice(1)] },
+  {
+    ...CATALOG[0],
+    units: [
+      { ...BUILT_UNIT, coverUrl: COVER, coverUrl2x: COVER_2X },
+      ...CATALOG[0].units.slice(1),
+    ],
+  },
   ...CATALOG.slice(1),
 ];
 
@@ -289,9 +299,25 @@ test('a filmed unit shows its still on the tile', async () => {
 
   const cover = button.querySelector('.unit-cover img');
   expect(cover).toHaveAttribute('src', COVER);
+  // Both widths on offer, so a phone and a laptop each fetch the one they need.
+  expect(cover).toHaveAttribute('srcset', `${COVER} 384w, ${COVER_2X} 768w`);
+  expect(cover).toHaveAttribute('sizes');
   // Decoration beside a title that already names the unit.
   expect(cover).toHaveAttribute('alt', '');
   expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(4);
+});
+
+test('a server that sends one cover size still gets its still shown', async () => {
+  const older = [
+    { ...CATALOG[0], units: [{ ...BUILT_UNIT, coverUrl: COVER }, ...CATALOG[0].units.slice(1)] },
+    ...CATALOG.slice(1),
+  ];
+  mockBackend({ '/catalog': older });
+  renderApp();
+  const cover = (await tile()).querySelector('.unit-cover img');
+
+  expect(cover).toHaveAttribute('src', COVER);
+  expect(cover).not.toHaveAttribute('srcset');
 });
 
 test('a still that will not load falls back to the drawn cover', async () => {
@@ -302,6 +328,35 @@ test('a still that will not load falls back to the drawn cover', async () => {
   fireEvent.error(button.querySelector('.unit-cover img')!);
   expect(button.querySelector('.unit-cover img')).toBeNull();
   expect(button.querySelector('.unit-cover.is-generated')).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// What goes on the wire
+// ---------------------------------------------------------------------------
+
+const headersSentTo = (suffix: string) => {
+  const call = (global.fetch as jest.Mock).mock.calls.find(([url]) =>
+    String(url).endsWith(suffix),
+  );
+  expect(call).toBeDefined();
+  return new Headers((call![1] as RequestInit | undefined)?.headers);
+};
+
+test('a request with no body is not labelled JSON, so the browser sends no preflight', async () => {
+  mockBackend();
+  renderApp();
+  await tile();
+
+  expect(headersSentTo('/catalog').has('Content-Type')).toBe(false);
+});
+
+test('a request with a JSON body says so', async () => {
+  mockBackend();
+  renderApp();
+  userEvent.click(await tile());
+  await composer();
+
+  expect(headersSentTo('/practices').get('Content-Type')).toBe('application/json');
 });
 
 // ---------------------------------------------------------------------------

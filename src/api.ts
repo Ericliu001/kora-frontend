@@ -55,15 +55,22 @@ function aborted(reason: unknown): boolean {
 export async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const ms = SLOW_PATHS.some((slow) => path.endsWith(slow)) ? SLOW_TIMEOUT_MS : TIMEOUT_MS;
 
+  // Only a JSON body is labelled as one. On a request with no body the header
+  // describes nothing, and it costs a round trip: `application/json` makes a
+  // cross-origin request non-simple, so the browser asks permission with an
+  // OPTIONS call first — and the catalogue, which the home page waits on, is
+  // exactly such a request. FormData is left alone so the browser can write
+  // its own multipart boundary.
+  const sendsJson = options.body != null && !(options.body instanceof FormData);
+
   let response: Response;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       signal: timeoutSignal(ms),
       ...options,
-      headers:
-        options.body instanceof FormData
-          ? options.headers
-          : { 'Content-Type': 'application/json', ...options.headers },
+      headers: sendsJson
+        ? { 'Content-Type': 'application/json', ...options.headers }
+        : options.headers,
     });
   } catch (reason) {
     const detail = reason instanceof Error ? reason.message : String(reason);
