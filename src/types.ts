@@ -5,16 +5,33 @@
 export type Level = 'DEVELOPING' | 'BETTER' | 'BEST';
 
 /**
- * One of the three things the training ground teaches, with everything under it.
+ * One of the three things the training ground teaches.
  *
- * The whole curriculum arrives in one response — including the units nobody has
- * written yet — so the browser holds no list of its own to drift out of step.
+ * `unitCount` is how many units the module holds in all, which can be more than
+ * have been loaded so far.
  */
-export interface CatalogModule {
+export interface ModuleInfo {
   id: string;
   title: string;
   blurb: string;
+  unitCount: number;
+}
+
+/**
+ * One page of the curriculum, in the order it is taught.
+ *
+ * The units arrive flat, because a page can end halfway through a module; each
+ * names its module with `moduleId`. `modules` comes with the first page only.
+ * `next` is the cursor to send back as `after` for the following page, and is
+ * absent on the last one. How long a page is, is the server's business — nothing
+ * here may assume a size.
+ */
+export interface CatalogPage {
+  modules?: ModuleInfo[] | null;
   units: UnitSummary[];
+  next?: string | null;
+  /** Every unit in the curriculum, loaded or not. */
+  total: number;
 }
 
 /**

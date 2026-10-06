@@ -2,15 +2,8 @@ import React, { useEffect, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import ErrorNotice from '../components/ErrorNotice';
 import StepStrip from '../components/StepStrip';
-import { AppError, isPageLevel } from '../errors';
+import { isPageLevel } from '../errors';
 import { Practising } from '../hooks/usePractice';
-import { UnitSummary } from '../types';
-
-const NOT_READY: AppError = {
-  kind: 'conflict',
-  code: 'UNIT_NOT_READY',
-  message: "That one isn't built yet.",
-};
 
 /** Holds the layout while the first turn is on its way. */
 function PracticeSkeleton() {
@@ -33,16 +26,13 @@ function PracticeSkeleton() {
  *
  * The unit comes from the URL, so a pasted link starts a practice with no click
  * — the same [start] the tile calls, from the other direction.
+ *
+ * Nothing here reads the catalogue. The home page holds only the pages it has
+ * loaded, so a unit further down the curriculum is simply not in the browser,
+ * and looking it up would call a real unit unknown. The server knows every
+ * unit, and already says which of "no such unit" and "not built yet" applies.
  */
-export default function PracticeScreen({
-  practice,
-  findUnit,
-  catalogReady,
-}: {
-  practice: Practising;
-  findUnit: (id: string) => UnitSummary | undefined;
-  catalogReady: boolean;
-}) {
+export default function PracticeScreen({ practice }: { practice: Practising }) {
   const { unitId: routeUnitId } = useParams<{ unitId: string }>();
   const {
     unitId,
@@ -61,22 +51,15 @@ export default function PracticeScreen({
   // and start the same doomed request again.
   const attempted = useRef<string | null>(null);
 
-  const known = routeUnitId ? findUnit(routeUnitId) : undefined;
-  const notReady = !!known && !known.playable;
-
   useEffect(() => {
-    if (!routeUnitId || !catalogReady) return;
-    // A unit nobody has written is answered from the catalogue. Asking the
-    // server would get the same answer, one round trip later — and with
-    // twenty-nine previews on the grid this is now the common case.
-    if (notReady) return;
+    if (!routeUnitId) return;
     if (unitId === routeUnitId && turn) return;
     if (attempted.current === routeUnitId) return;
     attempted.current = routeUnitId;
     void start(routeUnitId);
-  }, [routeUnitId, catalogReady, notReady, unitId, turn, start]);
+  }, [routeUnitId, unitId, turn, start]);
 
-  const blocking = notReady ? NOT_READY : error && isPageLevel(error) ? error : null;
+  const blocking = error && isPageLevel(error) ? error : null;
   if (blocking) {
     return (
       <ErrorNotice error={blocking} variant="page">

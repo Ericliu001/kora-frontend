@@ -293,6 +293,17 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 .unit-tile.is-skeleton .unit-cover { filter: saturate(.2); }
 .unit-tile.is-skeleton .unit-body { padding-bottom: 1.25rem; }
 
+/* The way to the rest of the roadmap, under the last tile loaded. */
+.load-more {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: .75rem;
+  margin: 3rem 0 0;
+}
+.load-more .primary-button { margin-top: 0; }
+.load-more p { margin: 0; }
+
 /* --- Intro panel -------------------------------------------------------- */
 
 .back-button,

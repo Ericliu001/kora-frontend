@@ -71,7 +71,7 @@ The layering rule underneath that is worth keeping:
 | [src/screens/PracticeScreen.tsx](src/screens/PracticeScreen.tsx) | The practice room: the unit beside a row of turn pages, the URL-driven start |
 | [src/screens/RecapScreen.tsx](src/screens/RecapScreen.tsx) | The recap, turn by turn, and one line worth keeping |
 | [src/hooks/usePractice.ts](src/hooks/usePractice.ts) | One practice from first line to recap — the real state machine |
-| [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) | The whole curriculum in one request, plus `findUnit` and a reload |
+| [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) | The curriculum a page at a time: the first page, `loadMore`, and a reload |
 | [src/hooks/useVoiceInput.ts](src/hooks/useVoiceInput.ts) | Microphone, recording and transcription upload |
 | [src/hooks/useTheme.ts](src/hooks/useTheme.ts) | Light/dark, stored and applied to `<html>` |
 | [src/components/](src/components) | Everything a screen is made of (see below) |
@@ -134,9 +134,16 @@ rather than on a practice screen that would have to explain itself. The same
 `start()` runs from the other direction when `/units/:unitId` is pasted into a
 fresh tab.
 
-A unit that is in the catalogue but not written yet is answered from the
-catalogue, without asking the server: the server would give the same answer one
-round trip later, and with 29 previews that is now the common case.
+The practice screen does not read the catalogue. The home page holds only the
+pages it has loaded, so a unit further down the curriculum is not in the browser
+at all; the server is asked, and it already answers both "no such unit" (404)
+and "not built yet" (409).
+
+The home page opens on the first page of units and a "Show more units" button
+that appends the next one. Units arrive flat and are filed under their module by
+`moduleId`; a module has no heading until its first unit has loaded. Page sizes
+are the server's (10 units) and nothing in the browser assumes them. A page
+that fails to load shows its error beside the button and leaves the tiles alone.
 
 `/units/:unitId/recap` redirects to `/` when there is nothing in flight. A
 practice lives in memory only, so there is nothing to resume after a reload.
@@ -156,7 +163,7 @@ untouched so audio uploads keep their own boundary, and times
 everything out after 10 seconds — 45 for the two calls that wait on a model,
 `/reflections` and `/transcribe`.
 
-Five endpoints are used: `GET /catalog`, `POST /practices`, and the three under
+Five endpoints are used: `GET /units`, `POST /practices`, and the three under
 `POST /practices/:id/` — `transcribe`, `reflections` and `complete`.
 
 > **The wire types are mirrored by hand.** [src/types.ts](src/types.ts) is a
@@ -178,7 +185,7 @@ is shown:
 | --- | --- | --- |
 | Banner, above the page | offline, timeout, 5xx | The page still works. Dismissible, cleared on navigation, and carries **Try again**, because the same request could work twice. |
 | Inline, beside the control | a 4xx with a message, no microphone, microphone refused | Fixing the input *is* the retry. The server's own words are used verbatim: it knows what was wrong with the request and we do not. |
-| Page, replacing the content | unknown unit (404), unit not built yet (409), practice finished (409), catalogue failed to load | There is nothing else on the page worth showing. |
+| Page, replacing the content | unknown unit (404), unit not built yet (409), practice finished (409), first page of the catalogue failed to load | There is nothing else on the page worth showing. |
 
 A 5xx keeps the server's message off screen — at that status it can be a stack
 detail, and fixed copy is what a person should read; the detail goes to

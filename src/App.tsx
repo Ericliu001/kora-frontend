@@ -58,23 +58,24 @@ function App() {
             element={
               <HomeScreen
                 modules={catalog.modules}
+                units={catalog.units}
+                remaining={catalog.remaining}
+                hasMore={catalog.hasMore}
                 isLoading={catalog.isLoading}
                 error={catalog.error}
+                isLoadingMore={catalog.isLoadingMore}
+                moreError={catalog.moreError}
+                arrived={catalog.arrived}
                 startingId={practice.startingId}
                 onRetry={catalog.reload}
+                onLoadMore={catalog.loadMore}
                 onStart={(unit) => practice.start(unit.id)}
               />
             }
           />
           <Route
             path="/units/:unitId"
-            element={
-              <PracticeScreen
-                practice={practice}
-                findUnit={catalog.findUnit}
-                catalogReady={!catalog.isLoading}
-              />
-            }
+            element={<PracticeScreen practice={practice} />}
           />
           <Route
             path="/units/:unitId/recap"

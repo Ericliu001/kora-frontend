@@ -60,30 +60,47 @@ const preview = (id: string, moduleId: string, title: string, skill: string) => 
   estimatedMinutes: 5,
 });
 
-const CATALOG = [
-  {
-    id: 'skills',
-    title: 'Skills',
-    blurb: 'The moves a conversation is made of.',
-    units: [
-      BUILT_UNIT,
-      preview('then-go-deep', 'skills', 'Then go deep', 'Follow-up questions'),
-      preview('find-common-ground', 'skills', 'Find common ground', 'Finding common ground'),
-    ],
-  },
+const MODULES = [
+  { id: 'skills', title: 'Skills', blurb: 'The moves a conversation is made of.', unitCount: 3 },
   {
     id: 'emotions',
     title: 'Emotions',
     blurb: 'Noticing what you and other people feel.',
-    units: [preview('sit-with-discomfort', 'emotions', 'Sit with discomfort', 'Staying present')],
+    unitCount: 1,
   },
-  {
-    id: 'heart',
-    title: 'Heart',
-    blurb: 'Attention, honesty and care.',
-    units: [preview('let-yourself-be-known', 'heart', 'Let yourself be known', 'Being known')],
-  },
+  { id: 'heart', title: 'Heart', blurb: 'Attention, honesty and care.', unitCount: 1 },
 ];
+
+/**
+ * The curriculum as the server pages it: five units over three pages.
+ *
+ * The pages are deliberately uneven, and the first boundary falls inside
+ * Skills — the app must file units under the right heading whenever they
+ * arrive, and must not assume how many a page brings.
+ */
+const PAGE_1 = {
+  modules: MODULES,
+  units: [BUILT_UNIT, preview('then-go-deep', 'skills', 'Then go deep', 'Follow-up questions')],
+  next: 'then-go-deep',
+  total: 5,
+};
+
+const PAGE_2 = {
+  units: [
+    preview('find-common-ground', 'skills', 'Find common ground', 'Finding common ground'),
+    preview('sit-with-discomfort', 'emotions', 'Sit with discomfort', 'Staying present'),
+  ],
+  next: 'sit-with-discomfort',
+  total: 5,
+};
+
+const PAGE_3 = {
+  units: [preview('let-yourself-be-known', 'heart', 'Let yourself be known', 'Being known')],
+  total: 5,
+};
+
+const PAGE_2_URL = '/units?after=then-go-deep';
+const PAGE_3_URL = '/units?after=sit-with-discomfort';
 
 const TURN_1 = {
   id: 'starting-chat-1',
@@ -176,9 +193,14 @@ const RETRY_REFLECTION = {
   nextTurn: undefined,
 };
 
+/** A route that answers with an error body instead of a page. */
+const refusing = (status: number, body: Record<string, string>) => ({ refusal: { status, body } });
+
 function mockBackend(overrides: Record<string, unknown> = {}) {
   const routes: Record<string, unknown> = {
-    '/catalog': CATALOG,
+    '/units': PAGE_1,
+    [PAGE_2_URL]: PAGE_2,
+    [PAGE_3_URL]: PAGE_3,
     '/practices': PRACTICE,
     '/practices/p1/reflections': REFLECTION,
     ...overrides,
@@ -190,6 +212,14 @@ function mockBackend(overrides: Record<string, unknown> = {}) {
       .sort((a, b) => b.length - a.length)
       .find((path) => url.endsWith(path));
     if (!match) return Promise.reject(new Error(`unmocked route: ${url}`));
+    const refusal = (routes[match] as { refusal?: { status: number; body: unknown } }).refusal;
+    if (refusal) {
+      return Promise.resolve({
+        ok: false,
+        status: refusal.status,
+        json: () => Promise.resolve(refusal.body),
+      } as Response);
+    }
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -214,6 +244,12 @@ const composer = () => screen.findByRole('textbox');
 
 const tile = () => screen.findByRole('button', { name: /start a conversation/i });
 
+const showMore = () => screen.findByRole('button', { name: /show more units/i });
+const tiles = (container: HTMLElement) => container.querySelectorAll('.unit-grid > li');
+const headings = () => screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
+const requestsTo = (suffix: string) =>
+  (global.fetch as jest.Mock).mock.calls.filter(([url]) => String(url).endsWith(suffix));
+
 /** One click. There is nothing between the grid and the practice room. */
 async function reachThePracticeRoom() {
   userEvent.click(await tile());
@@ -229,16 +265,91 @@ async function replyWith(text: string) {
 // The curriculum
 // ---------------------------------------------------------------------------
 
-test('the home page lays out all three modules, in order', async () => {
+test('the home page opens on the first page of units, and says how many are left', async () => {
   mockBackend();
   const { container } = renderApp();
+  await tile();
 
-  await screen.findByRole('heading', { name: 'Skills' });
-  const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
-  expect(headings).toEqual(['Skills', 'Emotions', 'Heart']);
+  expect(tiles(container)).toHaveLength(2);
+  // A module nobody has loaded a unit of has no heading yet: a heading over an
+  // empty grid would promise tiles that are not there.
+  expect(headings()).toEqual(['Skills']);
+  expect(await showMore()).toBeEnabled();
+  expect(screen.getByText('3 more units to see')).toBeInTheDocument();
+  expect(requestsTo(PAGE_2_URL)).toHaveLength(0);
+});
 
+test('showing more appends the next page under the right headings', async () => {
+  mockBackend();
+  const { container } = renderApp();
+  userEvent.click(await showMore());
+
+  // The page boundary fell inside Skills: its third unit joins the first two
+  // under the heading that is already there, and Emotions arrives with its first.
+  expect(await screen.findByText('Sit with discomfort')).toBeInTheDocument();
+  expect(headings()).toEqual(['Skills', 'Emotions']);
+  expect(tiles(container)).toHaveLength(4);
+  const skills = container.querySelector('[data-module="skills"]')!;
+  expect(within(skills as HTMLElement).getByText('Find common ground')).toBeInTheDocument();
+  expect(screen.getByText('MODULE 2')).toBeInTheDocument();
+
+  expect(screen.getByRole('status')).toHaveTextContent('2 more units shown.');
+  expect(screen.getByText('1 more unit to see')).toBeInTheDocument();
+});
+
+test('the last page lays out all three modules, in order, and takes the button away', async () => {
+  mockBackend();
+  const { container } = renderApp();
+  userEvent.click(await showMore());
+  await screen.findByText('Sit with discomfort');
+  userEvent.click(await showMore());
+
+  expect(await screen.findByText('Let yourself be known')).toBeInTheDocument();
+  expect(headings()).toEqual(['Skills', 'Emotions', 'Heart']);
   // Every unit in the catalogue is on the page, written or not.
-  expect(container.querySelectorAll('.unit-grid > li')).toHaveLength(5);
+  expect(tiles(container)).toHaveLength(5);
+  expect(screen.queryByRole('button', { name: /show more units/i })).not.toBeInTheDocument();
+  expect(screen.queryByText(/to see/i)).not.toBeInTheDocument();
+});
+
+test('two clicks on show more are one request', async () => {
+  mockBackend();
+  renderApp();
+  const button = await showMore();
+  userEvent.click(button);
+  userEvent.click(button);
+
+  await screen.findByText('Sit with discomfort');
+  expect(requestsTo(PAGE_2_URL)).toHaveLength(1);
+});
+
+test('a page that will not load keeps the tiles already here, and can be retried', async () => {
+  mockBackend({ [PAGE_2_URL]: refusing(500, { error: 'boom', code: 'INTERNAL' }) });
+  const { container } = renderApp();
+  userEvent.click(await showMore());
+
+  expect(await screen.findByRole('alert')).toHaveTextContent(/something went wrong on our side/i);
+  expect(tiles(container)).toHaveLength(2);
+  expect(await tile()).toBeEnabled();
+
+  mockBackend();
+  userEvent.click(screen.getByRole('button', { name: /try again/i }));
+  expect(await screen.findByText('Sit with discomfort')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+});
+
+test('units loaded so far are still there after a practice', async () => {
+  mockBackend();
+  const { container } = renderApp();
+  userEvent.click(await showMore());
+  await screen.findByText('Sit with discomfort');
+
+  await reachThePracticeRoom();
+  userEvent.click(container.querySelector('.back-to-units')!);
+
+  await tile();
+  expect(tiles(container)).toHaveLength(4);
+  expect(requestsTo('/units')).toHaveLength(1);
 });
 
 test('a unit nobody has written yet is on the map, but is not a door', async () => {
@@ -248,8 +359,8 @@ test('a unit nobody has written yet is on the map, but is not a door', async () 
 
   // Readable, and not a disabled button: a disabled button leaves the tab
   // order, and being read is the whole job of a roadmap.
-  expect(screen.getByText('Find common ground')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /find common ground/i })).not.toBeInTheDocument();
+  expect(screen.getByText('Then go deep')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /then go deep/i })).not.toBeInTheDocument();
   expect(screen.getAllByText(/preview/i).length).toBeGreaterThan(0);
 });
 
@@ -261,9 +372,9 @@ test('a preview says what it will teach and how long it takes', async () => {
   // A roadmap that will not say what is on it is not much of a roadmap, and
   // the catalogue knows both facts about every unit before anyone writes one.
   const locked = Array.from(container.querySelectorAll('.unit-tile.is-locked')).find((tile) =>
-    tile.textContent?.includes('Find common ground'),
+    tile.textContent?.includes('Then go deep'),
   );
-  expect(locked).toHaveTextContent('Finding common ground');
+  expect(locked).toHaveTextContent('Follow-up questions');
   expect(locked).toHaveTextContent(/about 5 min/i);
 });
 
@@ -273,7 +384,7 @@ test('every tile gets a cover: a drawn one until the unit is filmed', async () =
   await tile();
 
   expect(container.querySelectorAll('.unit-cover img')).toHaveLength(0);
-  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(5);
+  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(2);
 });
 
 const STILL = 'units/start-a-conversation/image/image.jpg';
@@ -281,19 +392,13 @@ const resized = (width: number) =>
   `https://media.example/cdn-cgi/image/width=${width},quality=75,format=auto,onerror=redirect/${STILL}`;
 const COVER = resized(384);
 const COVER_2X = resized(768);
-const FILMED_CATALOG = [
-  {
-    ...CATALOG[0],
-    units: [
-      { ...BUILT_UNIT, coverUrl: COVER, coverUrl2x: COVER_2X },
-      ...CATALOG[0].units.slice(1),
-    ],
-  },
-  ...CATALOG.slice(1),
-];
+const FILMED_PAGE = {
+  ...PAGE_1,
+  units: [{ ...BUILT_UNIT, coverUrl: COVER, coverUrl2x: COVER_2X }, ...PAGE_1.units.slice(1)],
+};
 
 test('a filmed unit shows its still on the tile', async () => {
-  mockBackend({ '/catalog': FILMED_CATALOG });
+  mockBackend({ '/units': FILMED_PAGE });
   const { container } = renderApp();
   const button = await tile();
 
@@ -304,15 +409,15 @@ test('a filmed unit shows its still on the tile', async () => {
   expect(cover).toHaveAttribute('sizes');
   // Decoration beside a title that already names the unit.
   expect(cover).toHaveAttribute('alt', '');
-  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(4);
+  expect(container.querySelectorAll('.unit-cover.is-generated')).toHaveLength(1);
 });
 
 test('a server that sends one cover size still gets its still shown', async () => {
-  const older = [
-    { ...CATALOG[0], units: [{ ...BUILT_UNIT, coverUrl: COVER }, ...CATALOG[0].units.slice(1)] },
-    ...CATALOG.slice(1),
-  ];
-  mockBackend({ '/catalog': older });
+  const older = {
+    ...PAGE_1,
+    units: [{ ...BUILT_UNIT, coverUrl: COVER }, ...PAGE_1.units.slice(1)],
+  };
+  mockBackend({ '/units': older });
   renderApp();
   const cover = (await tile()).querySelector('.unit-cover img');
 
@@ -321,7 +426,7 @@ test('a server that sends one cover size still gets its still shown', async () =
 });
 
 test('a still that will not load falls back to the drawn cover', async () => {
-  mockBackend({ '/catalog': FILMED_CATALOG });
+  mockBackend({ '/units': FILMED_PAGE });
   renderApp();
   const button = await tile();
 
@@ -347,7 +452,7 @@ test('a request with no body is not labelled JSON, so the browser sends no prefl
   renderApp();
   await tile();
 
-  expect(headersSentTo('/catalog').has('Content-Type')).toBe(false);
+  expect(headersSentTo('/units').has('Content-Type')).toBe(false);
 });
 
 test('a request with a JSON body says so', async () => {
@@ -424,23 +529,31 @@ test('a pasted unit link starts training with no click', async () => {
   expect(await composer()).toBeInTheDocument();
 });
 
-test('a link to an unwritten unit says so, and asks the server nothing', async () => {
-  mockBackend();
+test('a link to a unit further down the curriculum than the first page still starts', async () => {
+  // The browser has loaded two units and this is neither of them. Only the
+  // server can say whether it exists, so the server is who gets asked.
+  mockBackend({ '/practices': { ...PRACTICE, unitId: 'find-common-ground' } });
+  renderApp('/units/find-common-ground');
+
+  expect(await composer()).toBeInTheDocument();
+  expect(JSON.parse(requestsTo('/practices')[0][1].body)).toEqual({ unitId: 'find-common-ground' });
+});
+
+test('a link to an unwritten unit says so, in the server’s words', async () => {
+  mockBackend({
+    '/practices': refusing(409, { error: "That one isn't built yet.", code: 'UNIT_NOT_READY' }),
+  });
   renderApp('/units/find-common-ground');
 
   expect(await screen.findByText(/isn't built yet/i)).toBeInTheDocument();
-  const asked = (global.fetch as jest.Mock).mock.calls.filter(([url]: [string]) =>
-    String(url).endsWith('/practices'),
-  );
-  expect(asked).toHaveLength(0);
+  expect(screen.getByRole('link', { name: /back to the training ground/i })).toBeInTheDocument();
+  await waitFor(() => expect(requestsTo('/practices')).toHaveLength(1));
 });
 
 test('a link to a unit that does not exist is answered once, not forever', async () => {
-  mockBackend();
-  (global.fetch as jest.Mock).mockImplementationOnce(() =>
-    Promise.resolve({ ok: true, status: 200, json: () => Promise.resolve(CATALOG) } as Response),
-  );
-  failWith(404, { error: "We couldn't find that unit.", code: 'UNKNOWN_UNIT' });
+  mockBackend({
+    '/practices': refusing(404, { error: "We couldn't find that unit.", code: 'UNKNOWN_UNIT' }),
+  });
   renderApp('/units/nonsense');
 
   expect(await screen.findByText(/couldn't find that unit/i)).toBeInTheDocument();
