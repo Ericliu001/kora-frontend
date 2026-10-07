@@ -552,7 +552,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 /* --- The coaching layer -------------------------------------------------- *
  *
  * The other language. Everything the app says about the conversation — the
- * move to practise, the checks, the box you type into — sits on one tinted
+ * instructions, the checks, the box you type into — sits on one tinted
  * ground behind one rail, full width, with no shadow and no tail. Four
  * differences at once, so the layers are told apart at a glance and not by
  * reading them.
@@ -680,7 +680,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 .composer-attempt { margin: -4px 0 9px; color: var(--text-light); font-size: 13px; }
 
-/* The move to practise: a card of its own, above the composer rather than
+/* The instructions: a card of their own, above the composer rather than
  * inside it. Same shape as the box below, because both are the coach speaking,
  * and a ground and rail of its own — teal against the composer's indigo — so
  * what is read and what is typed into are two things at a glance. */

@@ -7,7 +7,7 @@ import ErrorNotice from './ErrorNotice';
 /**
  * Where the learner takes their turn.
  *
- * Only the reply lives here. The move to practise is a card of its own, above
+ * Only the reply lives here. The instructions are a card of their own, above
  * this one — see CoachingCard. The label asks the open question on a first
  * attempt; on a retry it says how much is still open, and the chips in that
  * card say which parts — by the names the learner already read on the

@@ -2,7 +2,7 @@ import React from 'react';
 import { Coaching, CriterionResult } from '../types';
 
 /**
- * The move to practise, in front of the learner while they are composing.
+ * The instructions for this turn, in front of the learner while they are composing.
  *
  * A card of its own, above the box they reply in and not inside it, and a
  * different colour from it: the tip is read, the box is typed in, and the two
@@ -55,8 +55,8 @@ export default function CoachingCard({
   const counting = !shown && secondsLeft !== null;
 
   return (
-    <section className="coaching-card coach-surface" aria-label="The move to practise">
-      {!counting && <p className="card-kicker">THE MOVE TO PRACTISE</p>}
+    <section className="coaching-card coach-surface" aria-label="Instructions">
+      {!counting && <p className="card-kicker">INSTRUCTIONS</p>}
 
       <div className="coaching-body">
         {/* Always here, and empty until the instruction is: a screen reader is

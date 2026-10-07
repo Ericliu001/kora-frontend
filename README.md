@@ -86,7 +86,7 @@ its cover is the unit still when the catalogue sends a `coverUrl`, offered at
 two widths through `srcSet` when it also sends a `coverUrl2x`, and a drawn
 gradient with the unit's number otherwise, or if the still fails to load),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
-(the move to practise: one instruction, in a teal card of its own above the
+(the instructions: one sentence, in a teal card of its own above the
 composer, held back behind a countdown), `ReflectionScorecard` and `FeedbackPanel` (the three
 checks and what to take away), `ReflectionPending` (the same shape while the
 server is judging), `ErrorNotice` (every error a person sees, in three shapes),
@@ -106,7 +106,7 @@ and the nav above the row adds ← → buttons, one dot per turn and the arrow k
 a swipe at either end from turning into the browser's own back gesture.
 
 Each page, top to bottom: the character's line — the clip on a filmed turn, the
-words on a written one — and then either the move to practise, the composer and feedback, on the turn
+words on a written one — and then either the instructions, the composer and feedback, on the turn
 being worked on, or, on a page already left, the reply you moved on with and a
 folded "how it landed".
 

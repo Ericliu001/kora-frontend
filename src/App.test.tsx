@@ -131,16 +131,16 @@ const PRACTICE = {
 const REFLECTION = {
   level: 'BETTER',
   criteria: [
-    { id: 'greeting', label: 'You greeted him', captured: true, evidence: 'you opened with hello' },
+    { id: 'greeting', label: 'A greeting', captured: true, evidence: 'you opened with hello' },
     {
       id: 'introduce_self',
-      label: 'You introduced yourself',
+      label: 'Your name',
       captured: true,
       evidence: 'you gave him your name',
     },
     {
       id: 'ask_about_day',
-      label: 'You asked about his day',
+      label: 'A question about his day',
       captured: false,
       guidance: 'Ask Tom how his day is going.',
     },
@@ -174,16 +174,16 @@ const RETRY_REFLECTION = {
   ...REFLECTION,
   level: 'DEVELOPING',
   criteria: [
-    { id: 'greeting', label: 'You greeted him', captured: true, evidence: 'you opened with hello' },
+    { id: 'greeting', label: 'A greeting', captured: true, evidence: 'you opened with hello' },
     {
       id: 'introduce_self',
-      label: 'You introduced yourself',
+      label: 'Your name',
       captured: false,
       guidance: 'Introduce yourself by name.',
     },
     {
       id: 'ask_about_day',
-      label: 'You asked about his day',
+      label: 'A question about his day',
       captured: false,
       guidance: 'Ask Tom how his day is going.',
     },
@@ -258,8 +258,8 @@ async function reachThePracticeRoom() {
   await composer();
 }
 
-/** The move-to-practise card, which is on the page whether or not its instruction is. */
-const tipCard = () => screen.getByRole('region', { name: /the move to practise/i });
+/** The instructions card, which is on the page whether or not its instruction is. */
+const tipCard = () => screen.getByRole('region', { name: /^instructions$/i });
 
 /** Asks for the instruction now, from whichever state the card is in. */
 const showTheTip = () =>
@@ -652,11 +652,11 @@ test('submitting a reply shows all three checks, the feedback and a stronger rep
   const items = within(scorecard).getAllByRole('listitem');
   expect(items).toHaveLength(3);
 
-  expect(items[0]).toHaveTextContent('You greeted him');
+  expect(items[0]).toHaveTextContent('A greeting');
   expect(items[0]).toHaveTextContent('you opened with hello');
   expect(items[0]).toHaveClass('captured');
 
-  expect(items[2]).toHaveTextContent('You asked about his day');
+  expect(items[2]).toHaveTextContent('A question about his day');
   expect(items[2]).toHaveTextContent('Ask Tom how his day is going.');
   expect(items[2]).toHaveClass('missed');
 
@@ -969,7 +969,7 @@ test('a retry keeps what landed and asks for what is still open', async () => {
   // The two that are open are named; the one that landed is not repeated back.
   const chips = document.querySelectorAll('.guide-chip.open');
   expect(chips).toHaveLength(2);
-  expect(chips[0]).toHaveTextContent('You introduced yourself');
+  expect(chips[0]).toHaveTextContent('Your name');
 
   // A retry does not wait again: the instruction is out, with no countdown.
   expect(tipCard()).toHaveTextContent(COACHING.instruction);
@@ -1021,7 +1021,7 @@ test('a filmed turn keeps its instruction back until the line has been heard', a
 
   // The card and its heading are there from the start; the instruction is not.
   expect(tipCard()).toBeInTheDocument();
-  expect(screen.getByText('THE MOVE TO PRACTISE')).toBeInTheDocument();
+  expect(screen.getByText('INSTRUCTIONS')).toBeInTheDocument();
   expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
   expect(screen.queryByRole('timer')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: /^show instruction$/i })).toBeInTheDocument();
@@ -1041,7 +1041,7 @@ test('the clip ending counts down from five, then shows the instruction', async 
   // the heading steps aside while the seconds go by.
   const timer = within(tipCard()).getByRole('timer');
   expect(timer).toHaveTextContent('Showing instruction in 5 seconds');
-  expect(screen.queryByText('THE MOVE TO PRACTISE')).not.toBeInTheDocument();
+  expect(screen.queryByText('INSTRUCTIONS')).not.toBeInTheDocument();
   pass(1);
   expect(timer).toHaveTextContent('Showing instruction in 4 seconds');
   pass(3);
@@ -1051,7 +1051,7 @@ test('the clip ending counts down from five, then shows the instruction', async 
 
   pass(1);
   expect(tipCard()).toHaveTextContent(COACHING.instruction);
-  expect(screen.getByText('THE MOVE TO PRACTISE')).toBeInTheDocument();
+  expect(screen.getByText('INSTRUCTIONS')).toBeInTheDocument();
   expect(screen.queryByRole('timer')).not.toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /^show now$/i })).not.toBeInTheDocument();
 });
