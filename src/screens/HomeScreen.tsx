@@ -77,8 +77,9 @@ export default function HomeScreen({
         <div className="hero-content">
           <h1>Conversation practice with feedback</h1>
           <p>
-            Watch a short video of someone talking to you. Reply by speaking or typing. See what
-            you did well, what you missed, and how to say it better.
+            Improve your social skills by practising conversation and small talk. Watch a short
+            video of someone talking to you, reply by speaking or typing, and see what you did
+            well, what you missed, and how to say it better.
           </p>
         </div>
       </section>
