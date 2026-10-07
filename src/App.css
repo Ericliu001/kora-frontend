@@ -685,13 +685,53 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 .composer-attempt { margin: -4px 0 9px; color: var(--text-light); font-size: 13px; }
 
 /* The move to practise: a card of its own, above the composer rather than
- * inside it. Same tinted ground and rail as the box below, because both are
- * the coach speaking — the gap between them is what says they are two things. */
-.coaching-card { margin: 0 0 12px; padding: 18px; }
+ * inside it. Same shape as the box below, because both are the coach speaking,
+ * and a ground and rail of its own — teal against the composer's indigo — so
+ * what is read and what is typed into are two things at a glance. */
+.coaching-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  /* The heading leaves while the countdown runs. The card holds its height
+   * without it, so the composer underneath does not move. */
+  min-height: 7rem;
+  box-sizing: border-box;
+  margin: 0 0 12px;
+  padding: 18px;
+  border-left-color: var(--tip);
+  background: var(--tip-bg);
+}
 
-.coaching-move { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 0; }
-.coaching-move strong { font-size: 15px; }
-.coaching-move span { color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
+.coaching-card .card-kicker { color: var(--tip); }
+
+.coaching-body { display: flex; flex-direction: column; justify-content: center; min-height: 3rem; }
+
+.coaching-move { margin: 0; color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
+
+.coaching-body > .quiet-button { align-self: flex-start; }
+
+/* One sentence with a number in it. Only the number changes, so only the
+ * number is loud; it keeps a fixed width so the words either side stay put. */
+.tip-countdown { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; }
+.tip-countdown p { margin: 0; color: var(--text-dark); font-size: 1.05rem; }
+
+.tip-count {
+  display: inline-block;
+  min-width: 1ch;
+  color: var(--tip);
+  font-size: 2.5rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  animation: tip-tick .3s ease both;
+}
+
+@keyframes tip-tick {
+  from { opacity: .3; transform: scale(1.25); }
+  to { opacity: 1; transform: none; }
+}
 
 /* A retry only: the checks still open, by the names the scorecard gave them. */
 .guide-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
@@ -733,6 +773,9 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 /* --- Recap -------------------------------------------------------------- */
 
 .recap-panel { text-align: center; }
+
+/* The way back, where the practice page has it: first, and on the left. */
+.recap-top { margin: 0 0 32px; text-align: left; }
 
 .level-run {
   display: flex;
@@ -913,7 +956,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
   .check { animation: none; opacity: 1; }
   .skeleton-line { animation: none; }
   /* Page changes jump rather than glide — see StepStrip.tsx. */
-  .coach-surface { animation: none; }
+  .coach-surface, .tip-count { animation: none; }
   .step-dot, .step-strip { transition: none; }
   .unit-tile, .primary-button, .theme-toggle, .back-to-units, .unit-cover img { transition: none; }
 }

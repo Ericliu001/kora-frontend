@@ -79,7 +79,14 @@ function App() {
           />
           <Route
             path="/units/:unitId/recap"
-            element={<RecapScreen recap={practice.recap} onRestart={practice.restart} />}
+            element={
+              <RecapScreen
+                recap={practice.recap}
+                startingId={practice.startingId}
+                onRestart={practice.restart}
+                onNext={practice.start}
+              />
+            }
           />
           <Route path="/modules/:moduleId" element={<LegacyModuleRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />

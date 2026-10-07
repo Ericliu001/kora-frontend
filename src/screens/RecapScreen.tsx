@@ -1,19 +1,54 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import { LEVEL_LABEL, Recap } from '../types';
 
-/** What the whole conversation added up to. Computed on the server, not generated. */
+/**
+ * What the whole conversation added up to. Computed on the server, not generated.
+ *
+ * Two ways on. The main one is forward: the next unit that can be played, named
+ * on the button, so finishing a unit leads into the following one. The other is
+ * the same "← All units" the practice page has, in the same place — first on
+ * the page.
+ *
+ * Which unit is next is the server's answer, sent with the recap. After the
+ * last playable unit there is none, and the way back is the only way on.
+ */
 export default function RecapScreen({
   recap,
+  startingId,
   onRestart,
+  onNext,
 }: {
   recap: Recap | null;
+  /** The unit whose practice is being created, if any. */
+  startingId: string | null;
+  /** Leaves the finished practice behind and goes home. */
   onRestart: () => void;
+  /** Starts a practice of the unit with this id. */
+  onNext: (unitId: string) => void;
 }) {
   if (!recap) return <Navigate to="/" replace />;
 
+  const next = recap.nextUnit;
+  const isStarting = !!next && startingId === next.id;
+
   return (
     <section className="recap-panel">
+      <nav className="recap-top" aria-label="Recap">
+        {/* A real link, so it can be opened like one; the click also clears
+            the finished practice, which is why it does not just navigate. */}
+        <Link
+          className="back-to-units"
+          to="/"
+          onClick={(event) => {
+            event.preventDefault();
+            onRestart();
+          }}
+        >
+          <span aria-hidden="true">←</span> All units
+        </Link>
+      </nav>
+
       <p className="eyebrow">PRACTICE COMPLETE</p>
       <h1>
         You stayed in it for {recap.turnsCompleted === 1 ? 'a turn' : 'the whole conversation'}.
@@ -39,9 +74,16 @@ export default function RecapScreen({
         <blockquote>“{recap.suggestedLine}”</blockquote>
       </div>
 
-      <button className="primary-button" onClick={onRestart}>
-        Back to the training ground
-      </button>
+      {next && (
+        <button
+          className="primary-button"
+          onClick={() => onNext(next.id)}
+          disabled={isStarting}
+          aria-busy={isStarting}
+        >
+          {isStarting ? 'Starting…' : `Next unit: ${next.title} →`}
+        </button>
+      )}
     </section>
   );
 }

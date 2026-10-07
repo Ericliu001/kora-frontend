@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
@@ -236,7 +236,10 @@ const failWith = (status: number, body: Record<string, string>) =>
     json: () => Promise.resolve(body),
   } as Response);
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => {
+  jest.useRealTimers();
+  jest.restoreAllMocks();
+});
 
 // By role, not by label: the label is the guidance now, and it changes between
 // a first attempt and a retry. The textarea is the only textbox on the page.
@@ -255,6 +258,19 @@ async function reachThePracticeRoom() {
   userEvent.click(await tile());
   await composer();
 }
+
+/** The move-to-practise card, which is on the page whether or not its instruction is. */
+const tipCard = () => screen.getByRole('region', { name: /the move to practise/i });
+
+/** Asks for the instruction now, from whichever state the card is in. */
+const showTheTip = () =>
+  userEvent.click(screen.getByRole('button', { name: /^show (now|instruction)$/i }));
+
+/** Lets the countdown's clock run. Only for a test that has switched to fake timers. */
+const pass = (seconds: number) =>
+  act(() => {
+    jest.advanceTimersByTime(seconds * 1000);
+  });
 
 async function replyWith(text: string) {
   userEvent.type(await composer(), text);
@@ -889,17 +905,18 @@ test('a catalogue that will not load replaces the grid, and can be retried', asy
 // The coaching
 // ---------------------------------------------------------------------------
 
-test('the tip names the one move being practised, and nothing more', async () => {
+test('the tip is the one instruction for this turn, and nothing more', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
 
-  const tip = screen.getByRole('region', { name: /the move to practise/i });
-  expect(tip).toHaveTextContent(COACHING.label);
-  expect(tip).toHaveTextContent(COACHING.instruction);
+  showTheTip();
 
-  // Why the move works and a sample sentence both arrive with the turn, and
-  // neither is shown while the learner is composing.
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+
+  // The move's name, why it works and a sample sentence all arrive with the
+  // turn, and none of them is shown while the learner is composing.
+  expect(tipCard()).not.toHaveTextContent(COACHING.label);
   expect(screen.queryByText(COACHING.purpose)).not.toBeInTheDocument();
   expect(screen.queryByText(new RegExp(COACHING.example))).not.toBeInTheDocument();
   expect(screen.queryByText(/one way to say it/i)).not.toBeInTheDocument();
@@ -910,7 +927,9 @@ test('the tip is a card of its own, not part of the box you reply in', async () 
   renderApp();
   await reachThePracticeRoom();
 
-  const tip = screen.getByRole('region', { name: /the move to practise/i });
+  showTheTip();
+
+  const tip = tipCard();
   const composer = document.querySelector('.composer')!;
   expect(composer).not.toContainElement(tip);
   expect(composer).not.toHaveTextContent(COACHING.instruction);
@@ -926,7 +945,12 @@ test('each turn asks for its own move, not the same one three times', async () =
   await replyWith('Hi Tom, I am Alex.');
   userEvent.click(await screen.findByRole('button', { name: /continue/i }));
 
-  expect(await screen.findByText(NEXT_COACHING.instruction)).toBeInTheDocument();
+  // A new turn holds its instruction back again, like the first one did.
+  await waitFor(() => expect(tipCard()).toHaveTextContent(/showing instruction in/i));
+  expect(screen.queryByText(NEXT_COACHING.instruction)).not.toBeInTheDocument();
+
+  showTheTip();
+  expect(screen.getByText(NEXT_COACHING.instruction)).toBeInTheDocument();
   expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
 });
 
@@ -945,6 +969,10 @@ test('a retry keeps what landed and asks for what is still open', async () => {
   const chips = document.querySelectorAll('.guide-chip.open');
   expect(chips).toHaveLength(2);
   expect(chips[0]).toHaveTextContent('You introduced yourself');
+
+  // A retry does not wait again: the instruction is out, with no countdown.
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument();
 });
 
 /**
@@ -979,6 +1007,229 @@ test('moving to the next turn clears the retry guidance', async () => {
 
   expect(await screen.findByText(/what would you say back to tom\?/i)).toBeInTheDocument();
   expect(screen.queryByText(/attempt 2 of 3/i)).not.toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// The instruction, held back
+// ---------------------------------------------------------------------------
+
+test('a filmed turn keeps its instruction back until the line has been heard', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+
+  // The card and its heading are there from the start; the instruction is not.
+  expect(tipCard()).toBeInTheDocument();
+  expect(screen.getByText('THE MOVE TO PRACTISE')).toBeInTheDocument();
+  expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /^show instruction$/i })).toBeInTheDocument();
+  // The reply box is never held back with it.
+  expect(screen.getByRole('textbox')).toBeEnabled();
+});
+
+test('the clip ending counts down from five, then shows the instruction', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+  jest.useFakeTimers();
+
+  fireEvent.ended(document.querySelector('video')!);
+
+  // Inside the card, in a sentence that says what it is for — and alone there:
+  // the heading steps aside while the seconds go by.
+  const timer = within(tipCard()).getByRole('timer');
+  expect(timer).toHaveTextContent('Showing instruction in 5 seconds');
+  expect(screen.queryByText('THE MOVE TO PRACTISE')).not.toBeInTheDocument();
+  pass(1);
+  expect(timer).toHaveTextContent('Showing instruction in 4 seconds');
+  pass(3);
+  expect(timer).toHaveTextContent('Showing instruction in 1 second');
+  expect(timer).not.toHaveTextContent('1 seconds');
+  expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
+
+  pass(1);
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+  expect(screen.getByText('THE MOVE TO PRACTISE')).toBeInTheDocument();
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^show now$/i })).not.toBeInTheDocument();
+});
+
+test('showing the words starts the same countdown', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+  jest.useFakeTimers();
+
+  userEvent.click(screen.getByRole('button', { name: /show the words/i }));
+  expect(screen.getByRole('timer')).toHaveTextContent('Showing instruction in 5 seconds');
+
+  pass(5);
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+});
+
+test('the instruction can be asked for at once, before or during the countdown', async () => {
+  mockBackend({ '/practices': FILMED });
+  const { unmount } = renderApp();
+  await reachThePracticeRoom();
+
+  // Before anything has been heard.
+  userEvent.click(screen.getByRole('button', { name: /^show instruction$/i }));
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+  unmount();
+
+  // And while the seconds are going by.
+  renderApp();
+  await reachThePracticeRoom();
+  fireEvent.ended(document.querySelector('video')!);
+  expect(screen.getByRole('timer')).toBeInTheDocument();
+
+  userEvent.click(screen.getByRole('button', { name: /^show now$/i }));
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+  expect(screen.queryByRole('timer')).not.toBeInTheDocument();
+});
+
+test('a written turn starts counting as soon as it opens', async () => {
+  jest.useFakeTimers();
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  // Its words are already on the page, so there is nothing to wait for.
+  expect(screen.getByRole('timer')).toHaveTextContent(/showing instruction in \d seconds?/i);
+  expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
+
+  pass(5);
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+});
+
+test('a clip that will not load starts the countdown, because its words are shown', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+
+  fireEvent.error(document.querySelector('video')!);
+  expect(await screen.findByRole('timer')).toBeInTheDocument();
+});
+
+test('there is one countdown per turn: nothing restarts it', async () => {
+  mockBackend({ '/practices': FILMED });
+  renderApp();
+  await reachThePracticeRoom();
+  jest.useFakeTimers();
+
+  const video = document.querySelector('video')!;
+  fireEvent.ended(video);
+  pass(2);
+  expect(screen.getByRole('timer')).toHaveTextContent('in 3 seconds');
+
+  // Playing it again, hearing it out again, opening and closing the words.
+  fireEvent.play(video);
+  fireEvent.ended(video);
+  userEvent.click(screen.getByRole('button', { name: /show the words/i }));
+  userEvent.click(screen.getByRole('button', { name: /hide the words/i }));
+  expect(screen.getByRole('timer')).toHaveTextContent('in 3 seconds');
+
+  pass(3);
+  expect(tipCard()).toHaveTextContent(COACHING.instruction);
+});
+
+// ---------------------------------------------------------------------------
+// The recap
+// ---------------------------------------------------------------------------
+
+const RECAP = {
+  turnsCompleted: 1,
+  levels: ['BETTER'],
+  turns: [{ turnNumber: 1, skillLabel: COACHING.label, level: 'BETTER', met: 2 }],
+  strongest: COACHING.label,
+  focus: COACHING.label,
+  summary: 'Your strongest turn was introduce and open, where you landed 2 of three.',
+  suggestedLine: "Hi Tom, I'm Alex. Good to meet you — how's your day been?",
+  nextUnit: { id: 'answer-with-a-thread', title: 'Answer with a thread' },
+};
+
+/** What the server sends back when the next unit is started. */
+const NEXT_PRACTICE = {
+  ...PRACTICE,
+  id: 'p2',
+  unitId: 'answer-with-a-thread',
+  unitTitle: 'Answer with a thread',
+};
+
+/** The recap's own way back — the footer has an "All units" of its own. */
+const backFromRecap = () =>
+  within(screen.getByRole('navigation', { name: 'Recap' })).getByRole('link', {
+    name: /all units/i,
+  });
+
+async function reachTheRecap(recap: unknown = RECAP) {
+  mockBackend({ '/practices/p1/complete': recap });
+  renderApp();
+  await reachThePracticeRoom();
+  await replyWith('Hi Tom, I am Alex.');
+  await screen.findByRole('button', { name: /continue/i });
+  userEvent.click(screen.getByRole('button', { name: /finish & see recap/i }));
+  await screen.findByText('PRACTICE COMPLETE');
+}
+
+test('the recap leads on to the next unit, by name', async () => {
+  await reachTheRecap();
+
+  const next = screen.getByRole('button', { name: /next unit: answer with a thread/i });
+  (global.fetch as jest.Mock).mockResolvedValueOnce({
+    ok: true,
+    status: 200,
+    json: () => Promise.resolve(NEXT_PRACTICE),
+  } as Response);
+  userEvent.click(next);
+
+  // A new practice of that unit, and its practice page.
+  expect(await screen.findByRole('heading', { name: 'Answer with a thread' })).toBeInTheDocument();
+  expect(screen.queryByText('PRACTICE COMPLETE')).not.toBeInTheDocument();
+  const [, options] = requestsTo('/practices').pop()!;
+  expect(JSON.parse(String(options.body))).toEqual({ unitId: 'answer-with-a-thread' });
+});
+
+test('the way back from the recap is All units, first on the page', async () => {
+  await reachTheRecap();
+
+  const back = backFromRecap();
+  const headline = screen.getByRole('heading', { level: 1 });
+  expect(back.compareDocumentPosition(headline) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The old button is gone, not kept beside the new link.
+  expect(screen.queryByText(/back to the training ground/i)).not.toBeInTheDocument();
+
+  userEvent.click(back);
+  expect(await tile()).toBeInTheDocument();
+  expect(screen.queryByText('PRACTICE COMPLETE')).not.toBeInTheDocument();
+});
+
+test('after the last playable unit the recap offers no next unit', async () => {
+  await reachTheRecap({ ...RECAP, nextUnit: null });
+
+  expect(screen.queryByRole('button', { name: /next unit/i })).not.toBeInTheDocument();
+  expect(backFromRecap()).toBeInTheDocument();
+});
+
+test('a server that does not say what is next still gets a recap', async () => {
+  const { nextUnit, ...older } = RECAP;
+  await reachTheRecap(older);
+
+  expect(screen.getByText(RECAP.summary)).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /next unit/i })).not.toBeInTheDocument();
+});
+
+test('a next unit that will not start leaves the recap where it was', async () => {
+  await reachTheRecap();
+
+  failWith(500, { error: 'boom' });
+  userEvent.click(screen.getByRole('button', { name: /next unit/i }));
+
+  expect(await screen.findByRole('alert')).toBeInTheDocument();
+  expect(screen.getByText('PRACTICE COMPLETE')).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /next unit: answer with a thread/i })).toBeEnabled();
 });
 
 // ---------------------------------------------------------------------------

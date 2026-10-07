@@ -69,9 +69,10 @@ The layering rule underneath that is worth keeping:
 | [src/App.tsx](src/App.tsx) | The shell: chrome, routes, the one practice |
 | [src/screens/HomeScreen.tsx](src/screens/HomeScreen.tsx) | The map: hero, three module sections, unit tiles, loading skeleton |
 | [src/screens/PracticeScreen.tsx](src/screens/PracticeScreen.tsx) | The practice room: the unit beside a row of turn pages, the URL-driven start |
-| [src/screens/RecapScreen.tsx](src/screens/RecapScreen.tsx) | The recap, turn by turn, and one line worth keeping |
+| [src/screens/RecapScreen.tsx](src/screens/RecapScreen.tsx) | The recap, turn by turn, one line worth keeping, and the way on to the next unit |
 | [src/hooks/usePractice.ts](src/hooks/usePractice.ts) | One practice from first line to recap — the real state machine |
 | [src/hooks/useCatalog.ts](src/hooks/useCatalog.ts) | The curriculum a page at a time: the first page, `loadMore`, and a reload |
+| [src/hooks/useCountdown.ts](src/hooks/useCountdown.ts) | Whole seconds from 5 to 0, for the instruction's countdown |
 | [src/hooks/useVoiceInput.ts](src/hooks/useVoiceInput.ts) | Microphone, recording and transcription upload |
 | [src/hooks/useTheme.ts](src/hooks/useTheme.ts) | Light/dark, stored and applied to `<html>` |
 | [src/components/](src/components) | Everything a screen is made of (see below) |
@@ -85,8 +86,8 @@ its cover is the unit still when the catalogue sends a `coverUrl`, offered at
 two widths through `srcSet` when it also sends a `coverUrl2x`, and a drawn
 gradient with the unit's number otherwise, or if the still fails to load),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
-(the move to practise: its name and one instruction, in a card of its own above
-the composer), `ReflectionScorecard` and `FeedbackPanel` (the three
+(the move to practise: one instruction, in a teal card of its own above the
+composer, held back behind a countdown), `ReflectionScorecard` and `FeedbackPanel` (the three
 checks and what to take away), `ReflectionPending` (the same shape while the
 server is judging), `ErrorNotice` (every error a person sees, in three shapes),
 and the practice itself — see [One page per turn](#one-page-per-turn):
@@ -106,8 +107,20 @@ a swipe at either end from turning into the browser's own back gesture.
 
 Each page, top to bottom: the character's reaction to your last reply (a later
 turn only), their line — the clip on a filmed turn, the words on a written one —
-and then either the composer and feedback, on the turn being worked on, or, on a
-page already left, the reply you moved on with and a folded "how it landed".
+and then either the move to practise, the composer and feedback, on the turn
+being worked on, or, on a page already left, the reply you moved on with and a
+folded "how it landed".
+
+**The instruction is held back.** The move-to-practise card is on the page when
+the turn opens, but its instruction is not. Once the learner has had the line —
+the clip played to its end, or the words are showing — the card drops its heading, reads
+"Showing instruction in 5 seconds" and counts down, then shows the heading and
+the instruction. A written
+turn, or a clip that fails, has its words showing already, so it counts from
+the start. "Show instruction" (before) and "Show now" (during) skip the wait.
+There is one countdown per turn, a retry never waits again, and the reply box
+is usable throughout. `StepPage` decides which state the card is in, because it
+lasts the whole turn; `CoachingCard` only draws it.
 
 Pages exist only up to the turn being worked on: there is nothing ahead of it
 until you have replied, so later dots are placeholders. **Looking is not
@@ -145,6 +158,13 @@ that appends the next one. Units arrive flat and are filed under their module by
 `moduleId`; a module has no heading until its first unit has loaded. Page sizes
 are the server's (10 units) and nothing in the browser assumes them. A page
 that fails to load shows its error beside the button and leaves the tiles alone.
+
+The recap has two ways on. **← All units** is first on the page, as on the
+practice page, and clears the finished practice. The main button, **Next unit:
+<title> →**, starts the unit the server names in the recap's `nextUnit` — the
+next playable one in curriculum order, which the browser cannot work out from
+the catalogue pages it happens to hold. After the last playable unit there is
+no `nextUnit` and no main button.
 
 `/units/:unitId/recap` redirects to `/` when there is nothing in flight. A
 practice lives in memory only, so there is nothing to resume after a reload.

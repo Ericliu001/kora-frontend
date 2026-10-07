@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
+import { useCountdown } from '../hooks/useCountdown';
 import { Practising } from '../hooks/usePractice';
 import { LEVEL_LABEL, Step } from '../types';
 import CoachingCard from './CoachingCard';
@@ -17,7 +18,16 @@ import StepClip from './StepClip';
  * the turn is not filmed), then — on the turn being worked on — the move to
  * practise and the composer as two separate cards, or the feedback; or, on a
  * page already left, what you said and how it went.
+ *
+ * The instruction in the move-to-practise card is held back. It shows itself
+ * [TIP_DELAY_SECONDS] after the learner has had the line — the clip ended, or
+ * the words are on the page — or at once if they ask. That is decided here,
+ * not in the card, because this component lasts the whole turn: the card comes
+ * and goes with the feedback, and a retry must find its instruction still out.
  */
+/** How long the learner has to think of their own reply before the instruction shows. */
+const TIP_DELAY_SECONDS = 5;
+
 export default function StepPage({
   step,
   isCurrent,
@@ -33,6 +43,18 @@ export default function StepPage({
 }) {
   const { turn, outcome } = step;
 
+  // A written turn has its words on the page from the start, so it has been
+  // "heard" as soon as it opens. A filmed one waits for the clip to say so.
+  const [heard, setHeard] = useState(!turn.videoUrl);
+  const [asked, setAsked] = useState(false);
+  const markHeard = useCallback(() => setHeard(true), []);
+  const showTip = useCallback(() => setAsked(true), []);
+  // One countdown per turn. Nothing restarts it, and it runs on whether or not
+  // this page is the one on screen.
+  const secondsLeft = useCountdown(isCurrent && heard && !asked, TIP_DELAY_SECONDS);
+  // A retry never waits again: the chips for what is still open live in the card.
+  const tipShown = asked || secondsLeft === 0 || practice.attemptNumber > 1;
+
   return (
     <div className="step-page">
       {turn.bridge && <Said name={turn.speaker} text={turn.bridge} kind="bridge" />}
@@ -43,18 +65,32 @@ export default function StepPage({
           active={isActive}
           videoRef={isCurrent ? practice.videoRef : undefined}
           onPlayingChange={isCurrent ? practice.markClipPlaying : undefined}
+          onHeard={markHeard}
         />
       ) : (
         <Said name={turn.speaker} text={turn.line} />
       )}
 
-      {isCurrent ? <YourTurn practice={practice} /> : outcome && <Outcome outcome={outcome} />}
+      {isCurrent ? (
+        <YourTurn
+          practice={practice}
+          tip={{ shown: tipShown, secondsLeft, onShow: showTip }}
+        />
+      ) : (
+        outcome && <Outcome outcome={outcome} />
+      )}
     </div>
   );
 }
 
 /** The turn being worked on: the tip and the composer, or your reply and what came back. */
-function YourTurn({ practice }: { practice: Practising }) {
+function YourTurn({
+  practice,
+  tip,
+}: {
+  practice: Practising;
+  tip: { shown: boolean; secondsLeft: number | null; onShow: () => void };
+}) {
   const { busy, reflection, lastReply, coaching, carriedCriteria, continueAfterFeedback, isLoading } =
     practice;
   const assessing = busy === 'assessing';
@@ -77,7 +113,7 @@ function YourTurn({ practice }: { practice: Practising }) {
         />
       ) : (
         <>
-          <CoachingCard coaching={coaching} openCriteria={carriedCriteria} />
+          <CoachingCard coaching={coaching} openCriteria={carriedCriteria} {...tip} />
           <Composer practice={practice} />
         </>
       )}

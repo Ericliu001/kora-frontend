@@ -29,6 +29,10 @@
    * success/warn washes, and --primary-color on --tint in dark, all sit
    * just under WCAG AA at rounder numbers. Nudged until they clear 4.5:1. */
   --tint: #eef1fe;            /* faint primary wash — selected, pending rows */
+  /* The move-to-practise card: teal, the one hue here that means nothing else.
+   * Pink is what somebody said, green landed, amber is still open. */
+  --tip: #0e7490;
+  --tip-bg: #ecfafb;
   --success: #15803d;
   --success-bg: #f2faf5;
   --warn: #b45309;
@@ -68,6 +72,8 @@
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, .4), 0 10px 10px -5px rgba(0, 0, 0, .3);
 
   --tint: #242b45;
+  --tip: #5ec5d6;
+  --tip-bg: #16323a;
   --success: #6ee7a8;
   --success-bg: #1c3a2c;
   --warn: #fbbf5c;

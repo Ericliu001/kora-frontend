@@ -155,6 +155,17 @@ export interface TurnRecap {
   met: number;
 }
 
+/**
+ * Where the recap's main button leads: the next unit that can be played.
+ *
+ * The server sends it because the browser cannot work it out — it holds only
+ * the catalogue pages it has loaded, and the next unit may not be on one.
+ */
+export interface NextUnit {
+  id: string;
+  title: string;
+}
+
 export interface Recap {
   turnsCompleted: number;
   levels: Level[];
@@ -163,6 +174,8 @@ export interface Recap {
   focus?: string;
   summary: string;
   suggestedLine: string;
+  /** Absent after the last playable unit, and on a server older than the field. */
+  nextUnit?: NextUnit | null;
 }
 
 /**

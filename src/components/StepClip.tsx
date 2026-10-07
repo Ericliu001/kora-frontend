@@ -14,12 +14,17 @@ import Said from './Said';
  * along, for a quiet room, or for anyone who would rather read than listen. If
  * the clip will not load, the words are simply shown, so a broken video costs
  * the video and nothing else.
+ *
+ * [onHeard] is told when the learner has had the line, by ear or by eye: the
+ * clip played to its end, they opened the words, or the clip failed and the
+ * words took its place. It may be told more than once.
  */
 export default function StepClip({
   turn,
   active,
   videoRef,
   onPlayingChange,
+  onHeard,
 }: {
   turn: Turn;
   /** Its page is the one on screen. */
@@ -28,6 +33,8 @@ export default function StepClip({
   videoRef?: React.MutableRefObject<HTMLVideoElement | null>;
   /** Told when the current turn's clip starts and stops. */
   onPlayingChange?: (playing: boolean) => void;
+  /** Told when the line has been heard to the end, or read. */
+  onHeard?: () => void;
 }) {
   const own = useRef<HTMLVideoElement | null>(null);
   const [playing, setPlaying] = useState(false);
@@ -100,11 +107,14 @@ export default function StepClip({
           onEnded={() => {
             setFinished(true);
             report(false);
+            onHeard?.();
           }}
           // No clip at that address, or a codec this browser won't take.
           onError={() => {
             setFailed(true);
             report(false);
+            // The words are on the page in its place.
+            onHeard?.();
           }}
         />
         {!playing && (
@@ -116,7 +126,10 @@ export default function StepClip({
       <div className="stage-actions">
         <button
           className="quiet-button"
-          onClick={() => setShowWords((shown) => !shown)}
+          onClick={() => {
+            if (!showWords) onHeard?.();
+            setShowWords(!showWords);
+          }}
           aria-expanded={showWords}
         >
           {showWords ? 'Hide the words' : 'Show the words'}
