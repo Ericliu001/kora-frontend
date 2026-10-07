@@ -89,16 +89,14 @@ export interface Practice {
 /**
  * One thing the character says.
  *
- * `bridge` is their reaction to what you just said and `line` is the authored
- * continuation; they arrive separately because only the second one is fixed.
- * On a filmed turn the clip speaks `line` word for word, and `bridge` — written
- * live, after your reply — stays text. `videoUrl` is absent on a written turn.
+ * `line` is authored, and it is all they say: nothing is written live in
+ * reaction to your reply. On a filmed turn the clip speaks `line` word for
+ * word. `videoUrl` is absent on a written turn.
  */
 export interface Turn {
   id: string;
   speaker: string;
   turnNumber: number;
-  bridge?: string | null;
   line: string;
   coaching: Coaching;
   videoUrl?: string;

@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Something a person said: the character's line or reaction, or your reply.
+ * Something a person said: the character's line, or your reply.
  *
  * The practice room speaks two visual languages and this is one of them. What
  * anybody said is a bubble with a name over it; everything the app says about
@@ -9,8 +9,7 @@ import React from 'react';
  * nothing there takes a bubble.
  *
  * `kind` picks the voice: `line` is the thing being answered and the loudest
- * text on the page, `bridge` is the character's short reaction to your last
- * reply, `you` is your own words.
+ * text on the page, `you` is your own words.
  */
 export default function Said({
   name,
@@ -20,7 +19,7 @@ export default function Said({
 }: {
   name: string;
   text: string;
-  kind?: 'line' | 'bridge' | 'you';
+  kind?: 'line' | 'you';
   isSending?: boolean;
 }) {
   const classes = ['said', kind, isSending ? 'is-sending' : ''].filter(Boolean).join(' ');

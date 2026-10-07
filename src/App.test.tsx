@@ -110,12 +110,11 @@ const TURN_1 = {
   coaching: COACHING,
 };
 
-/** A later turn arrives with the character's reaction in front of its line. */
+/** A later turn is its authored line and nothing else. */
 const TURN_2 = {
   id: 'starting-chat-2',
   speaker: 'Tom',
   turnNumber: 2,
-  bridge: 'Thanks for asking.',
   line: "My day's been fairly quiet, mostly emails. What are you up to later?",
   coaching: NEXT_COACHING,
 };
@@ -608,21 +607,23 @@ test("the character's line is in the conversation before the learner replies", a
   expect(screen.getByRole('button', { name: /speak/i })).toBeEnabled();
 });
 
-test("the character's reaction opens their next page, ahead of their line", async () => {
-  mockBackend();
+test('the next page opens on their line, with no reaction in front of it', async () => {
+  // An older server still sends the reaction it wrote. It is not shown.
+  mockBackend({
+    '/practices/p1/reflections': {
+      ...REFLECTION,
+      nextTurn: { ...TURN_2, bridge: 'Thanks for asking.' },
+    },
+  });
   renderApp();
   await reachThePracticeRoom();
 
   await replyWith('Hi Tom, I am Alex.');
   userEvent.click(await screen.findByRole('button', { name: /continue/i }));
 
-  // The bridge answers what the learner actually said and the line after it
-  // is authored. They arrive apart and stay apart — on a filmed turn the clip
-  // says the line, and nothing could have filmed the bridge.
   const page = await screen.findByRole('region', { name: /turn 2 of 3/i });
-  const bridge = within(page).getByText(TURN_2.bridge);
-  const line = within(page).getByText(TURN_2.line);
-  expect(bridge.compareDocumentPosition(line) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(within(page).getByText(TURN_2.line)).toBeInTheDocument();
+  expect(screen.queryByText('Thanks for asking.')).not.toBeInTheDocument();
 });
 
 test('a retry stays on the same page, and the line is said once', async () => {

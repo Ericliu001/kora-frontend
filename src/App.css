@@ -517,10 +517,6 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
   box-shadow: var(--shadow-lg);
 }
 
-/* Their reaction to what you just said: part of the turn, quieter than the
- * line it leads into. */
-.said.bridge p { padding: 12px 18px; font-size: 1.0625rem; box-shadow: var(--shadow); }
-
 /* You already know what you said, so it keeps its colour and gives up the size. */
 .said.you { align-self: flex-end; }
 .said.you .said-name { color: var(--text-light); font-size: 12px; text-align: right; }

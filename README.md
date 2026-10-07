@@ -105,9 +105,8 @@ and the nav above the row adds ← → buttons, one dot per turn and the arrow k
 (ignored while typing in the reply box). `overscroll-behavior-x: contain` stops
 a swipe at either end from turning into the browser's own back gesture.
 
-Each page, top to bottom: the character's reaction to your last reply (a later
-turn only), their line — the clip on a filmed turn, the words on a written one —
-and then either the move to practise, the composer and feedback, on the turn
+Each page, top to bottom: the character's line — the clip on a filmed turn, the
+words on a written one — and then either the move to practise, the composer and feedback, on the turn
 being worked on, or, on a page already left, the reply you moved on with and a
 folded "how it landed".
 
@@ -217,9 +216,9 @@ into the box, draft included.
 
 A filmed turn arrives with `videoUrl` and `posterUrl` — absolute URLs the
 backend builds from bucket paths and `MEDIA_BASE_URL` — and `StepClip` plays it.
-The clip speaks the authored `line` word for word; the bridge before it is
-written live after your reply, so it stays text. Units without clips work
-exactly as before: the line is shown as words.
+The clip speaks the authored `line` word for word, and that is all the
+character says. Units without clips work exactly as before: the line is shown
+as words.
 
 `StepClip` never starts a clip by itself. It shows the poster — the unit still,
 which is the clip's own first frame — under one large **Play** button, which

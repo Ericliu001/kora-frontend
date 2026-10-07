@@ -13,9 +13,8 @@ import StepClip from './StepClip';
 /**
  * One turn, as one page: what they said, then your part.
  *
- * Top to bottom: their reaction to your last reply (a later turn only — it is
- * written live, so no clip can say it), their line (the clip, or the words when
- * the turn is not filmed), then — on the turn being worked on — the move to
+ * Top to bottom: their line (the clip, or the words when the turn is not
+ * filmed), then — on the turn being worked on — the move to
  * practise and the composer as two separate cards, or the feedback; or, on a
  * page already left, what you said and how it went.
  *
@@ -57,8 +56,6 @@ export default function StepPage({
 
   return (
     <div className="step-page">
-      {turn.bridge && <Said name={turn.speaker} text={turn.bridge} kind="bridge" />}
-
       {turn.videoUrl ? (
         <StepClip
           turn={turn}
