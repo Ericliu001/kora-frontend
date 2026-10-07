@@ -1159,7 +1159,7 @@ const NEXT_PRACTICE = {
   unitTitle: 'Answer with a thread',
 };
 
-/** The recap's own way back — the footer has an "All units" of its own. */
+/** The recap's own way back to the units. */
 const backFromRecap = () =>
   within(screen.getByRole('navigation', { name: 'Recap' })).getByRole('link', {
     name: /all units/i,
@@ -1374,7 +1374,7 @@ test('the way back to all units is the first thing on the practice page', async 
   renderApp();
   await reachThePracticeRoom();
 
-  // The footer has an "All units" link too; this one is the practice page's own.
+  // Looked for inside <main>, so the footer's links are out of the picture.
   const main = document.querySelector('main')!;
   const back = within(main).getByRole('link', { name: /all units/i });
   expect(back).toHaveAttribute('href', '/');
@@ -1382,4 +1382,39 @@ test('the way back to all units is the first thing on the practice page', async 
 
   userEvent.click(back);
   expect(await screen.findByRole('button', { name: /start a conversation/i })).toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// The footer and the company pages
+// ---------------------------------------------------------------------------
+
+const footer = () => within(screen.getByRole('contentinfo'));
+
+test.each([
+  ['About', /about onion loop/i, 'About | Onion Loop'],
+  ['Apps', /apps are coming soon/i, 'Apps | Onion Loop'],
+  ['Contact', /^contact$/i, 'Contact | Onion Loop'],
+])('the footer link %s opens a real page, named in the tab', async (link, heading, title) => {
+  mockBackend();
+  renderApp();
+  await tile();
+
+  userEvent.click(footer().getByRole('link', { name: link }));
+
+  expect(screen.getByRole('heading', { level: 1, name: heading })).toBeInTheDocument();
+  expect(document.title).toBe(title);
+});
+
+test('the footer has no Course column, and Home leads back to the units', async () => {
+  mockBackend();
+  renderApp('/about');
+
+  expect(footer().queryByRole('heading', { name: /course/i })).not.toBeInTheDocument();
+  expect(footer().queryByRole('link', { name: /all units/i })).not.toBeInTheDocument();
+
+  userEvent.click(footer().getByRole('link', { name: 'Home' }));
+
+  expect(await tile()).toBeInTheDocument();
+  // The About page gave the tab back when it left.
+  expect(document.title).not.toMatch(/about/i);
 });

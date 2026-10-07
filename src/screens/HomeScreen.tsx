@@ -75,11 +75,10 @@ export default function HomeScreen({
     <>
       <section className="hero bg-pattern-onion-hero">
         <div className="hero-content">
-          <p className="eyebrow">THE TRAINING GROUND</p>
-          <h1>Learn to talk to people, one unit at a time.</h1>
+          <h1>Conversation practice with feedback</h1>
           <p>
-            Short, repeatable exercises. Someone tells you something real, you reply out loud, and
-            you find out exactly what you caught and what you missed.
+            Watch a short video of someone talking to you. Reply by speaking or typing. See what
+            you did well, what you missed, and how to say it better.
           </p>
         </div>
       </section>

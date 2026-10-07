@@ -766,6 +766,34 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 .send-button { margin: 0; padding: 10px 16px; box-shadow: none; }
 
+/* --- Company pages (About, Apps, Contact) ------------------------------- */
+
+.info-page {
+  width: min(680px, calc(100% - 40px));
+  margin: 68px auto;
+}
+
+.info-page h1 {
+  margin: 0 0 8px;
+  font-size: clamp(2rem, 5vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -1.4px;
+  line-height: 1.08;
+}
+
+.info-page p { margin: 20px 0 0; font-size: 18px; line-height: 1.6; }
+.info-page a { color: var(--primary-color); }
+
+/* The same button as everywhere else, worn by a link. */
+.info-page a.primary-button {
+  display: inline-block;
+  color: var(--on-primary);
+  text-decoration: none;
+}
+
+.info-links { margin: 12px 0 0; padding: 0; list-style: none; font-size: 18px; }
+.info-links li { margin-bottom: 8px; }
+
 /* --- Recap -------------------------------------------------------------- */
 
 .recap-panel { text-align: center; }
@@ -931,7 +959,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
   .unit-grid { grid-template-columns: 1fr; }
   .module-section-head h2 { font-size: 1.4rem; }
-  .recap-panel { margin: 35px auto; }
+  .recap-panel, .info-page { margin: 35px auto; }
 
   .practice-layout { display: block; }
   .practice-side { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 12px 0; }

@@ -7,6 +7,9 @@ import SiteHeader from './components/SiteHeader';
 import { isPageLevel } from './errors';
 import { useCatalog } from './hooks/useCatalog';
 import { usePractice } from './hooks/usePractice';
+import AboutScreen from './screens/AboutScreen';
+import AppsScreen from './screens/AppsScreen';
+import ContactScreen from './screens/ContactScreen';
 import HomeScreen from './screens/HomeScreen';
 import PracticeScreen from './screens/PracticeScreen';
 import RecapScreen from './screens/RecapScreen';
@@ -88,6 +91,9 @@ function App() {
               />
             }
           />
+          <Route path="/about" element={<AboutScreen />} />
+          <Route path="/apps" element={<AppsScreen />} />
+          <Route path="/contact" element={<ContactScreen />} />
           <Route path="/modules/:moduleId" element={<LegacyModuleRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

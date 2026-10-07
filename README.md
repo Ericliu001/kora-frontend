@@ -138,6 +138,9 @@ short finished page does not sit above a screen of nothing.
 | `/` | The training ground: three module sections of unit tiles |
 | `/units/:unitId` | The practice room |
 | `/units/:unitId/recap` | The recap |
+| `/about` | What Onion Loop is |
+| `/apps` | "Apps are coming soon" |
+| `/contact` | Email and social links |
 | `/modules/:moduleId` | Redirects to `/units/:moduleId` — bookmarks from before units had their own name |
 
 Anything else redirects to `/`. There is no page between the map and the practice

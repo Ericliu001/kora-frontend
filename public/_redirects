@@ -1,2 +1,7 @@
+# Addresses the footer used to point at, before these pages lived in the app.
+/about.html     /about    301
+/contact.html   /contact  301
+/services.html  /apps     301
+
 # Client-side routing: every path is served by the single-page app.
 /*  /index.html  200
