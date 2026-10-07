@@ -58,13 +58,13 @@ export default function UnitTile({
   onStart: () => void;
 }) {
   /**
-   * Every tile says what it teaches and roughly how long it takes, whether or
-   * not anyone has written it. A roadmap that will not say what is on it is not
-   * much of a roadmap — and the catalogue knows both facts about all of them.
+   * A tile is a picture, a title and how long it takes — whether or not anyone
+   * has written the unit. The blurb and the skill it teaches both arrive with
+   * the catalogue and are deliberately left off: the title already says it.
    */
   const meta = (
     <span className="unit-meta">
-      {isStarting ? 'Starting…' : `${unit.skill} · about ${unit.estimatedMinutes} min`}
+      {isStarting ? 'Starting…' : `about ${unit.estimatedMinutes} min`}
       {unit.playable && !isStarting && ' →'}
     </span>
   );
@@ -78,7 +78,6 @@ export default function UnitTile({
           {!unit.playable && <span className="unit-badge">Preview</span>}
         </span>
         <strong>{unit.title}</strong>
-        <span className="unit-blurb">{unit.blurb}</span>
       </span>
     </>
   );

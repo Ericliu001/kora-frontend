@@ -62,9 +62,9 @@ export interface UnitSummary {
 /**
  * The one move being practised on this turn.
  *
- * All of it, `example` included, is in front of the learner *before* they
- * reply. That is the shape of the teaching: here is the move, here is why it
- * works, here is one way to do it — now say it with the facts of your own life.
+ * `label` and `instruction` are in front of the learner *before* they reply.
+ * `purpose` and `example` still arrive but are not shown while composing; the
+ * example can come back afterwards, as the feedback's "one way to say it".
  */
 export interface Coaching {
   skillKey: string;

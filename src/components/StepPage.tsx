@@ -1,6 +1,7 @@
 import React from 'react';
 import { Practising } from '../hooks/usePractice';
 import { LEVEL_LABEL, Step } from '../types';
+import CoachingCard from './CoachingCard';
 import Composer from './Composer';
 import FeedbackPanel from './FeedbackPanel';
 import ReflectionPending from './ReflectionPending';
@@ -13,8 +14,9 @@ import StepClip from './StepClip';
  *
  * Top to bottom: their reaction to your last reply (a later turn only — it is
  * written live, so no clip can say it), their line (the clip, or the words when
- * the turn is not filmed), then either the composer and feedback — on the turn
- * being worked on — or, on a page already left, what you said and how it went.
+ * the turn is not filmed), then — on the turn being worked on — the move to
+ * practise and the composer as two separate cards, or the feedback; or, on a
+ * page already left, what you said and how it went.
  */
 export default function StepPage({
   step,
@@ -51,9 +53,10 @@ export default function StepPage({
   );
 }
 
-/** The turn being worked on: the composer, or your reply and what came back. */
+/** The turn being worked on: the tip and the composer, or your reply and what came back. */
 function YourTurn({ practice }: { practice: Practising }) {
-  const { busy, reflection, lastReply, coaching, continueAfterFeedback, isLoading } = practice;
+  const { busy, reflection, lastReply, coaching, carriedCriteria, continueAfterFeedback, isLoading } =
+    practice;
   const assessing = busy === 'assessing';
 
   return (
@@ -73,7 +76,10 @@ function YourTurn({ practice }: { practice: Practising }) {
           isLoading={isLoading}
         />
       ) : (
-        <Composer practice={practice} />
+        <>
+          <CoachingCard coaching={coaching} openCriteria={carriedCriteria} />
+          <Composer practice={practice} />
+        </>
       )}
     </>
   );

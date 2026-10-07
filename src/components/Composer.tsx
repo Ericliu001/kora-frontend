@@ -2,21 +2,20 @@ import React from 'react';
 import { VOICE_UNSUPPORTED } from '../errors';
 import { Practising } from '../hooks/usePractice';
 import { MAX_ATTEMPTS_PER_TURN } from '../types';
-import CoachingCard from './CoachingCard';
 import ErrorNotice from './ErrorNotice';
 
 /**
  * Where the learner takes their turn.
  *
- * The label is the teaching. On a first attempt it asks the open question; on a
- * retry it says how much is still open, and the chips in the coaching card say
- * which parts — by the names the learner already read on the scorecard, never
- * by the words that were missing.
+ * Only the reply lives here. The move to practise is a card of its own, above
+ * this one — see CoachingCard. The label asks the open question on a first
+ * attempt; on a retry it says how much is still open, and the chips in that
+ * card say which parts — by the names the learner already read on the
+ * scorecard, never by the words that were missing.
  */
 export default function Composer({ practice }: { practice: Practising }) {
   const {
     turn,
-    coaching,
     carriedCriteria,
     attemptNumber,
     draft,
@@ -44,12 +43,6 @@ export default function Composer({ practice }: { practice: Practising }) {
   return (
     <div className="composer coach-surface">
       <p className="card-kicker composer-kicker">YOUR TURN</p>
-      <CoachingCard
-        key={`${turn.id}-${attemptNumber}`}
-        coaching={coaching}
-        openCriteria={carriedCriteria}
-        startOpen={turn.turnNumber === 1 || attemptNumber > 1}
-      />
       <label htmlFor="reflection-draft">{label}</label>
       {attemptNumber > 1 && (
         <p className="composer-attempt">

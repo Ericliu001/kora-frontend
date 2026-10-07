@@ -256,7 +256,6 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 }
 
 .unit-body strong { font-size: 1.15rem; font-weight: 700; line-height: 1.25; }
-.unit-blurb { color: var(--text-light); font-size: 14px; line-height: 1.45; }
 
 .unit-meta {
   padding: 14px 1.25rem 1.25rem;
@@ -582,8 +581,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
  * they take the transcript's ground instead — which is also the one place the
  * two languages are allowed to borrow from each other. */
 .coach-surface .stronger-reply,
-.coach-surface .check.pending,
-.coach-surface .guide-row { background: var(--white); }
+.coach-surface .check.pending { background: var(--white); }
 
 .card-kicker {
   margin: 0;
@@ -664,23 +662,6 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
  * rail turns the colour of a check that landed to say so without a word. */
 .stronger-reply.is-your-words { border-left-color: var(--success); }
 
-/* Second voice now, not first: the move to practise is what the learner is
- * meant to read, and the sample sentence is only there if they get stuck. It
- * takes the flat ground and the quieter type the instruction used to have. */
-.coaching-example {
-  margin: 14px 0 0;
-  padding: 11px 13px;
-  border-radius: 10px;
-  background: var(--bg-light);
-}
-
-.coaching-example blockquote {
-  margin: 6px 0 0;
-  color: var(--text-light);
-  font-size: 14px;
-  line-height: 1.45;
-}
-
 .pending-note { margin: 4px 0 0; color: var(--text-light); font-size: 14px; font-style: italic; }
 .composer-hint { margin: 10px 0 0; color: var(--text-light); font-size: 13px; }
 
@@ -691,8 +672,8 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 /* The rail is the composer's whole outline now, so it is what answers focus. */
 .composer:focus-within { border-left-color: var(--secondary-color); }
 
-/* Names the layer without competing with the kicker under it: two indigo
- * headings a line apart is one heading too many. */
+/* Quieter than the kicker on the card above it: two indigo headings a card
+ * apart is one heading too many. */
 .composer-kicker {
   margin: 0 0 12px;
   color: var(--text-light);
@@ -703,83 +684,26 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 .composer-attempt { margin: -4px 0 9px; color: var(--text-light); font-size: 13px; }
 
-/* The checklist the learner composes against. Same three rows, same order and
- * the same marks as .scorecard — one object, seen before and after. */
-.coaching-card {
-  margin: -4px 0 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border-color);
-}
+/* The move to practise: a card of its own, above the composer rather than
+ * inside it. Same tinted ground and rail as the box below, because both are
+ * the coach speaking — the gap between them is what says they are two things. */
+.coaching-card { margin: 0 0 12px; padding: 18px; }
 
-.coaching-card > summary {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
-  cursor: pointer;
-  list-style: none;
-}
+.coaching-move { display: flex; flex-direction: column; gap: 4px; margin: 10px 0 0; }
+.coaching-move strong { font-size: 15px; }
+.coaching-move span { color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
 
-.coaching-card > summary::-webkit-details-marker { display: none; }
-.coaching-card > summary::after {
-  margin-left: auto;
-  color: var(--text-light);
-  font-size: 12px;
-  content: '▾ show';
-}
-.coaching-card[open] > summary::after { content: '▴ hide'; }
-
-.guide-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* A retry only: the checks still open, by the names the scorecard gave them. */
+.guide-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; padding: 0; list-style: none; }
 
 .guide-chip {
   padding: 3px 9px;
   border-radius: 999px;
-  /* var(--white) rather than the tint it used to take: the composer under it
-   * is the tint now, and a chip the colour of its own background is not one. */
-  background: var(--white);
-  color: var(--text-light);
   font-size: 12px;
   font-weight: 700;
 }
 
-.guide-chip.captured { background: var(--success-bg); color: var(--success); }
 .guide-chip.open { background: var(--warn-bg); color: var(--warn); }
-
-/* Open the guide and the chips are redundant with the rows underneath. */
-.coaching-card[open] .guide-chips { display: none; }
-
-.coaching-card ul { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
-
-/* The loudest thing in the card: it carries the rail, the raised ground and
- * the reading size the example used to wear, so what to do is read before how
- * someone else said it. */
-.guide-row {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px 16px;
-  border-left: 3px solid var(--secondary-color);
-  border-radius: 10px;
-  background: var(--white);
-}
-
-.guide-row.captured { background: var(--success-bg); }
-.guide-row.open { background: var(--warn-bg); }
-
-.guide-mark { font-size: 15px; font-weight: 800; line-height: 1.4; color: var(--text-light); }
-.guide-row.captured .guide-mark { color: var(--success); }
-.guide-row.open .guide-mark { color: var(--warn); }
-
-.guide-body { flex: 1; display: flex; flex-direction: column; gap: 2px; }
-.guide-body strong { font-size: 15px; }
-.guide-body span { color: var(--text-dark); font-size: 1.05rem; line-height: 1.45; }
-.guide-body em { color: var(--primary-color); font-size: 13px; line-height: 1.45; }
-
-/* On a tinted row the indigo drops to ~4.2:1 in dark mode, under AA for 13px.
- * The italic already marks the purpose as a different voice, so the colour is
- * free to give way to the one that stays readable on every wash. */
-.guide-row.captured .guide-body em,
-.guide-row.open .guide-body em { color: var(--text-dark); }
 
 .composer textarea {
   width: 100%;

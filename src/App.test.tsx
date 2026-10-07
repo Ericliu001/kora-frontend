@@ -364,18 +364,21 @@ test('a unit nobody has written yet is on the map, but is not a door', async () 
   expect(screen.getAllByText(/preview/i).length).toBeGreaterThan(0);
 });
 
-test('a preview says what it will teach and how long it takes', async () => {
+test('a tile says how long the unit takes, and leaves the blurb and the skill off', async () => {
   mockBackend();
   const { container } = renderApp();
   await tile();
 
-  // A roadmap that will not say what is on it is not much of a roadmap, and
-  // the catalogue knows both facts about every unit before anyone writes one.
+  // A tile is a title and a length. The skill and the blurb both arrive with
+  // the catalogue and are deliberately left off the page.
   const locked = Array.from(container.querySelectorAll('.unit-tile.is-locked')).find((tile) =>
     tile.textContent?.includes('Then go deep'),
   );
-  expect(locked).toHaveTextContent('Follow-up questions');
   expect(locked).toHaveTextContent(/about 5 min/i);
+  expect(locked).not.toHaveTextContent('Follow-up questions');
+  expect(locked).not.toHaveTextContent('Then go deep — one day.');
+  expect(screen.queryByText(BUILT_UNIT.blurb)).not.toBeInTheDocument();
+  expect(screen.queryByText(new RegExp(BUILT_UNIT.skill))).not.toBeInTheDocument();
 });
 
 test('every tile gets a cover: a drawn one until the unit is filmed', async () => {
@@ -886,21 +889,33 @@ test('a catalogue that will not load replaces the grid, and can be retried', asy
 // The coaching
 // ---------------------------------------------------------------------------
 
-test('the composer names the one move being practised, and why it works', async () => {
+test('the tip names the one move being practised, and nothing more', async () => {
   mockBackend();
   renderApp();
   await reachThePracticeRoom();
 
-  const guide = screen.getByRole('list', { name: /what to aim for/i });
-  const rows = within(guide).getAllByRole('listitem');
-  expect(rows).toHaveLength(1);
+  const tip = screen.getByRole('region', { name: /the move to practise/i });
+  expect(tip).toHaveTextContent(COACHING.label);
+  expect(tip).toHaveTextContent(COACHING.instruction);
 
-  expect(rows[0]).toHaveTextContent(COACHING.label);
-  expect(rows[0]).toHaveTextContent(COACHING.instruction);
-  expect(rows[0]).toHaveTextContent(COACHING.purpose);
-  // The example is shown before the reply on purpose: the exercise is saying
-  // this with the facts of your own life, not guessing what to say.
-  expect(screen.getByText(`“${COACHING.example}”`)).toBeInTheDocument();
+  // Why the move works and a sample sentence both arrive with the turn, and
+  // neither is shown while the learner is composing.
+  expect(screen.queryByText(COACHING.purpose)).not.toBeInTheDocument();
+  expect(screen.queryByText(new RegExp(COACHING.example))).not.toBeInTheDocument();
+  expect(screen.queryByText(/one way to say it/i)).not.toBeInTheDocument();
+});
+
+test('the tip is a card of its own, not part of the box you reply in', async () => {
+  mockBackend();
+  renderApp();
+  await reachThePracticeRoom();
+
+  const tip = screen.getByRole('region', { name: /the move to practise/i });
+  const composer = document.querySelector('.composer')!;
+  expect(composer).not.toContainElement(tip);
+  expect(composer).not.toHaveTextContent(COACHING.instruction);
+  // Read first, then typed into.
+  expect(tip.compareDocumentPosition(composer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
 test('each turn asks for its own move, not the same one three times', async () => {
@@ -946,9 +961,9 @@ test('the retry guidance points at the missing move without giving the answer', 
 
   await replyWith('Hi.');
   userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
-  await screen.findByRole('list', { name: /what to aim for/i });
+  await screen.findByRole('list', { name: /still open/i });
 
-  const composerPanel = document.querySelector('.composer')!;
+  const composerPanel = document.querySelector('.step-page')!;
   expect(composerPanel).not.toHaveTextContent('Introduce yourself by name.');
   expect(composerPanel).not.toHaveTextContent('Ask Tom how his day is going.');
   expect(composerPanel).not.toHaveTextContent('you opened with hello');
@@ -1063,11 +1078,11 @@ test('a filmed turn waits for Play, and never starts by itself', async () => {
   // Nobody is talking until the learner asks them to.
   expect(screen.queryByText(/is still talking/i)).not.toBeInTheDocument();
 
-  userEvent.click(screen.getByRole('button', { name: /play tom/i }));
+  userEvent.click(screen.getByRole('button', { name: /^▶ play$/i }));
   expect(play).toHaveBeenCalledTimes(1);
 
   fireEvent.play(video);
-  expect(screen.queryByRole('button', { name: /play tom/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^▶ play$/i })).not.toBeInTheDocument();
   expect(screen.getByText(/tom is still talking/i)).toBeInTheDocument();
 
   fireEvent.ended(video);
@@ -1099,7 +1114,7 @@ test('a clip that will not load leaves the words, not a hole', async () => {
   fireEvent.error(document.querySelector('video')!);
   expect(await screen.findByText(TURN_1.line)).toBeInTheDocument();
   expect(document.querySelector('video')).toBeNull();
-  expect(screen.queryByRole('button', { name: /play tom/i })).not.toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /^▶ play$/i })).not.toBeInTheDocument();
 });
 
 test('the way back to all units is the first thing on the practice page', async () => {

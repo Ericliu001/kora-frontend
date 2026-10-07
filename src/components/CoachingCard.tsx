@@ -4,10 +4,13 @@ import { Coaching, CriterionResult } from '../types';
 /**
  * The move to practise, in front of the learner while they are composing.
  *
+ * A card of its own, above the box they reply in and not inside it: the tip is
+ * read, the box is typed in, and the two are told apart at a glance.
+ *
  * One move per turn, not one fixed trio per unit: turn 1 of a unit asks for
- * something narrower than turn 3, and the card says which. The example is here
- * deliberately — the exercise is not "guess the answer", it is "say this with
- * the facts of your own life".
+ * something narrower than turn 3, and the card says which. It names the move
+ * and says what to do, and nothing else — the reason the move works and a
+ * sample sentence both arrive with the turn and are deliberately not shown.
  *
  * [openCriteria] arrives only on a second attempt, and only as labels the
  * learner has already read on the scorecard. What was missing, in the author's
@@ -16,47 +19,33 @@ import { Coaching, CriterionResult } from '../types';
 export default function CoachingCard({
   coaching,
   openCriteria,
-  startOpen,
 }: {
   coaching: Coaching | null;
   openCriteria?: CriterionResult[] | null;
-  startOpen: boolean;
 }) {
   if (!coaching) return null;
 
   const still = openCriteria?.filter((criterion) => !criterion.captured) ?? [];
 
   return (
-    <details className="coaching-card" open={startOpen}>
-      <summary>
-        <span className="card-kicker">THE MOVE TO PRACTISE</span>
-        <span className="guide-chips" aria-hidden="true">
-          <span className="guide-chip neutral">{coaching.label}</span>
+    <section className="coaching-card coach-surface" aria-labelledby="coaching-card-title">
+      <p className="card-kicker" id="coaching-card-title">
+        THE MOVE TO PRACTISE
+      </p>
+      <p className="coaching-move">
+        <strong>{coaching.label}</strong>
+        <span>{coaching.instruction}</span>
+      </p>
+      {still.length > 0 && (
+        <ul className="guide-chips" aria-label="Still open">
           {still.map((criterion) => (
-            <span className="guide-chip open" key={criterion.id}>
-              ○ {criterion.label}
-            </span>
+            <li className="guide-chip open" key={criterion.id}>
+              <span aria-hidden="true">○ </span>
+              {criterion.label}
+            </li>
           ))}
-        </span>
-      </summary>
-
-      <ul aria-label="What to aim for">
-        <li className="guide-row">
-          <span className="guide-mark" aria-hidden="true">
-            ·
-          </span>
-          <span className="guide-body">
-            <strong>{coaching.label}</strong>
-            <span>{coaching.instruction}</span>
-            <em>{coaching.purpose}</em>
-          </span>
-        </li>
-      </ul>
-
-      <div className="coaching-example">
-        <p className="card-kicker">ONE WAY TO SAY IT</p>
-        <blockquote>“{coaching.example}”</blockquote>
-      </div>
-    </details>
+        </ul>
+      )}
+    </section>
   );
 }

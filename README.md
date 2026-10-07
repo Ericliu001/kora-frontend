@@ -85,7 +85,8 @@ its cover is the unit still when the catalogue sends a `coverUrl`, offered at
 two widths through `srcSet` when it also sends a `coverUrl2x`, and a drawn
 gradient with the unit's number otherwise, or if the still fails to load),
 `Composer` (the reply box, the speak button, the attempt counter), `CoachingCard`
-(the move to practise), `ReflectionScorecard` and `FeedbackPanel` (the three
+(the move to practise: its name and one instruction, in a card of its own above
+the composer), `ReflectionScorecard` and `FeedbackPanel` (the three
 checks and what to take away), `ReflectionPending` (the same shape while the
 server is judging), `ErrorNotice` (every error a person sees, in three shapes),
 and the practice itself — see [One page per turn](#one-page-per-turn):

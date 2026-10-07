@@ -109,7 +109,7 @@ export default function StepClip({
         />
         {!playing && (
           <button className="clip-play" onClick={play}>
-            {finished ? '↺ Play again' : started ? `▶ Resume` : `▶ Play ${turn.speaker}`}
+            {finished ? '↺ Play again' : started ? '▶ Resume' : '▶ Play'}
           </button>
         )}
       </div>
