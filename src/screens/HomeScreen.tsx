@@ -1,6 +1,7 @@
 import React from 'react';
 import ErrorNotice from '../components/ErrorNotice';
 import UnitTile from '../components/UnitTile';
+import WaitlistCta from '../components/WaitlistCta';
 import { AppError } from '../errors';
 import { ModuleInfo, UnitSummary } from '../types';
 
@@ -81,6 +82,7 @@ export default function HomeScreen({
             video of someone talking to you, reply by speaking or typing, and see what you did
             well, what you missed, and how to say it better.
           </p>
+          <WaitlistCta variant="hero" />
         </div>
       </section>
 

@@ -118,7 +118,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 /* Module sections are left-aligned reading matter, not a centred card. */
 .landing { text-align: left; }
 
-.recap-panel {
+.recap-panel,
+.coming-soon {
   width: min(760px, calc(100% - 40px));
   margin: 68px auto;
 }
@@ -131,7 +132,8 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   letter-spacing: 1.3px;
 }
 
-.recap-panel h1 {
+.recap-panel h1,
+.coming-soon h1 {
   margin: 0;
   font-size: clamp(2rem, 5vw, 3rem);
   font-weight: 800;
@@ -195,6 +197,12 @@ button.unit-tile:hover:not(:disabled) {
   transform: translateY(-5px);
   box-shadow: var(--shadow-lg);
 }
+
+/* A Preview tile is a link to its coming-soon page: no underline, and a
+ * smaller lift than a unit you can practise, so it still reads unfinished. */
+a.unit-tile { text-decoration: none; }
+a.unit-tile:hover { transform: translateY(-3px); border-color: var(--primary-color); }
+a.unit-tile:focus-visible { outline: 3px solid var(--primary-color); outline-offset: 3px; }
 
 /* Square, because the cover art is square: a 16/9 window would crop the top
  * and bottom off every still. The stand-in keeps the same ratio so tiles in a
@@ -330,6 +338,56 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 .primary-button:hover:not(:disabled) { background: var(--primary-dark); transform: translateY(-2px); }
 .primary-button:active:not(:disabled) { transform: translateY(0); }
+
+/* --- Waitlist ----------------------------------------------------------- */
+
+/* Both are links wearing a button, so they set their own display and drop
+ * the underline. */
+.hero-button,
+.secondary-button {
+  display: inline-block;
+  padding: 1rem 2rem;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform .3s ease, background .3s ease, color .3s ease;
+}
+
+.hero-button {
+  background: var(--on-hero);
+  color: var(--on-hero-text);
+  box-shadow: var(--shadow-lg);
+}
+.hero-button:hover { transform: translateY(-2px); }
+.hero-button:focus-visible { outline: 3px solid var(--on-hero); outline-offset: 3px; }
+
+/* The outline twin of .primary-button: same shape, less weight. */
+.secondary-button {
+  border: 2px solid var(--primary-color);
+  color: var(--primary-color);
+  background: transparent;
+}
+.secondary-button:hover { background: var(--tint); }
+
+.waitlist { margin-top: 2rem; }
+.waitlist-offer { margin: .75rem 0 0; font-size: 15px; }
+.hero .waitlist-offer { margin-top: .75rem; font-size: 1rem; opacity: .9; }
+.waitlist.is-quiet { margin-top: 2.5rem; }
+.waitlist.is-quiet .waitlist-offer { color: var(--text-light); }
+
+/* The same button as everywhere else, worn by a link. */
+.waitlist a.primary-button {
+  display: inline-block;
+  margin-top: 0;
+  color: var(--on-primary);
+  text-decoration: none;
+}
+.waitlist.is-primary { margin-top: 2rem; }
+.waitlist.is-primary .waitlist-offer { color: var(--text-light); }
+
+/* The length belongs to the description above it, not to the button below. */
+.coming-soon .intro { margin-bottom: 12px; }
+.coming-soon .waitlist { margin-top: 2.5rem; }
 
 /* --- Practice room ------------------------------------------------------ */
 
@@ -796,7 +854,8 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 /* --- Recap -------------------------------------------------------------- */
 
-.recap-panel { text-align: center; }
+.recap-panel,
+.coming-soon { text-align: center; }
 
 /* The way back, where the practice page has it: first, and on the left. */
 .recap-top { margin: 0 0 32px; text-align: left; }
@@ -959,7 +1018,7 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
   .unit-grid { grid-template-columns: 1fr; }
   .module-section-head h2 { font-size: 1.4rem; }
-  .recap-panel, .info-page { margin: 35px auto; }
+  .recap-panel, .coming-soon, .info-page { margin: 35px auto; }
 
   .practice-layout { display: block; }
   .practice-side { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 12px 0; }

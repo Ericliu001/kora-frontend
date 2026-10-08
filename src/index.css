@@ -14,6 +14,11 @@
    * indigo 400 is about 2.9:1 — unreadable, and the reason this token exists. */
   --on-primary: #ffffff;
   --secondary-color: #FF17A6; /* Logo pink */
+  /* A button drawn on the hero. The hero's gradient is the same in both
+   * themes (App.css), so these are deliberately NOT redefined under
+   * [data-theme="dark"]: a button that flipped would sit dark-on-indigo. */
+  --on-hero: #ffffff;
+  --on-hero-text: #4338CA;    /* Indigo 700 — 7.6:1 on white */
   --text-dark: #1f2937;
   --text-light: #6b7280;
   --bg-light: #f9fafb;

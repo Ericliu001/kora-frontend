@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import WaitlistCta from '../components/WaitlistCta';
 import { LEVEL_LABEL, Recap } from '../types';
 
 /**
@@ -12,6 +13,8 @@ import { LEVEL_LABEL, Recap } from '../types';
  *
  * Which unit is next is the server's answer, sent with the recap. After the
  * last playable unit there is none, and the way back is the only way on.
+ *
+ * Below both sits the waitlist for the full course, quieter than Next unit.
  */
 export default function RecapScreen({
   recap,
@@ -84,6 +87,10 @@ export default function RecapScreen({
           {isStarting ? 'Starting…' : `Next unit: ${next.title} →`}
         </button>
       )}
+
+      {/* Under the way on, never instead of it: finishing a unit is when the
+          rest of the course is most wanted, but the next unit comes first. */}
+      <WaitlistCta variant="quiet" />
     </section>
   );
 }

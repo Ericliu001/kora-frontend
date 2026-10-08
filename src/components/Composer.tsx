@@ -9,7 +9,7 @@ import ErrorNotice from './ErrorNotice';
  *
  * Only the reply lives here. The instructions are a card of their own, above
  * this one — see CoachingCard. The label asks the open question on a first
- * attempt; on a retry it says how much is still open, and the chips in that
+ * attempt; on a retry it just says "Try again", and the chips in that
  * card say which parts — by the names the learner already read on the
  * scorecard, never by the words that were missing.
  */
@@ -36,9 +36,7 @@ export default function Composer({ practice }: { practice: Practising }) {
 
   const stillOpen = carriedCriteria?.filter((criterion) => !criterion.captured) ?? [];
   const label =
-    stillOpen.length > 0
-      ? `Try again — ${stillOpen.length} of the three is still open.`
-      : `What would you say back to ${turn.speaker}?`;
+    stillOpen.length > 0 ? 'Try again' : `What would you say back to ${turn.speaker}?`;
 
   return (
     <div className="composer coach-surface">

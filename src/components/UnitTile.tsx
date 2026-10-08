@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { UnitSummary } from '../types';
 
 /**
@@ -83,19 +84,20 @@ export default function UnitTile({
   );
 
   /**
-   * Not a disabled button.
+   * A unit not built yet is a link to its coming-soon page, at the unit's own
+   * address. Not a disabled button: that would leave the tab order, and a
+   * screen reader user tabbing the grid would never learn these units exist.
+   * "Preview" is part of the link's name, so they know before following it.
    *
-   * A `disabled` button leaves the tab order in every browser, so a screen
-   * reader user tabbing the grid would never learn these units exist — and
-   * being read is the entire job of a roadmap. Plain content is fully readable
-   * in browse mode, has nothing focusable to disappoint, and nothing to click.
+   * The unit rides along in router state, so that page can name it without
+   * asking the server — which would only answer "not built yet".
    */
   if (!unit.playable) {
     return (
-      <article className="unit-tile is-locked">
+      <Link className="unit-tile is-locked" to={`/units/${unit.id}`} state={{ preview: unit }}>
         {body}
         {meta}
-      </article>
+      </Link>
     );
   }
 

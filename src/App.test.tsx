@@ -3,6 +3,16 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import App from './App';
+import WaitlistCta from './components/WaitlistCta';
+import { WAITLIST_OFFER } from './waitlist';
+
+// The real form address is pasted in by hand and may still be empty. Every
+// test here sees a stand-in, so the waitlist is always on the page.
+const FORM_URL = 'https://forms.gle/waitlist-test';
+jest.mock('./waitlist', () => ({
+  ...jest.requireActual('./waitlist'),
+  WAITLIST_FORM_URL: 'https://forms.gle/waitlist-test',
+}));
 
 // App reads the route, so it needs a router around it. MemoryRouter keeps that
 // entirely in memory — no jsdom history to reset between tests.
@@ -169,12 +179,17 @@ const BEST_REFLECTION = {
   feedback: 'You did all three parts of introduce and open.',
 };
 
-/** A first attempt that lands one check only, so the learner is sent back. */
+/** A first attempt that lands no check at all, so the learner is sent back. */
 const RETRY_REFLECTION = {
   ...REFLECTION,
   level: 'DEVELOPING',
   criteria: [
-    { id: 'greeting', label: 'A greeting', captured: true, evidence: 'you opened with hello' },
+    {
+      id: 'greeting',
+      label: 'A greeting',
+      captured: false,
+      guidance: 'Open with a hello.',
+    },
     {
       id: 'introduce_self',
       label: 'Your name',
@@ -367,16 +382,20 @@ test('units loaded so far are still there after a practice', async () => {
   expect(requestsTo('/units')).toHaveLength(1);
 });
 
-test('a unit nobody has written yet is on the map, but is not a door', async () => {
+test('a unit nobody has written yet is on the map, as a door to the waitlist', async () => {
   mockBackend();
   renderApp();
   await tile();
 
-  // Readable, and not a disabled button: a disabled button leaves the tab
-  // order, and being read is the whole job of a roadmap.
-  expect(screen.getByText('Then go deep')).toBeInTheDocument();
+  // A link, not a disabled button: a disabled button leaves the tab order, and
+  // being read is the whole job of a roadmap. "Preview" is in its name, so it
+  // is said before it is followed.
+  const unbuilt = screen.getByRole('link', { name: /then go deep/i });
+  expect(unbuilt).toHaveAccessibleName(expect.stringMatching(/preview/i));
+  expect(unbuilt).toHaveAttribute('href', '/units/then-go-deep');
   expect(screen.queryByRole('button', { name: /then go deep/i })).not.toBeInTheDocument();
-  expect(screen.getAllByText(/preview/i).length).toBeGreaterThan(0);
+  // A unit you can practise is still a button.
+  expect(await tile()).toBeInTheDocument();
 });
 
 test('a tile says how long the unit takes, and leaves the blurb and the skill off', async () => {
@@ -557,14 +576,22 @@ test('a link to a unit further down the curriculum than the first page still sta
   expect(JSON.parse(requestsTo('/practices')[0][1].body)).toEqual({ unitId: 'find-common-ground' });
 });
 
-test('a link to an unwritten unit says so, in the server’s words', async () => {
+test('a link to an unwritten unit lands on its coming-soon page, with the waitlist', async () => {
   mockBackend({
     '/practices': refusing(409, { error: "That one isn't built yet.", code: 'UNIT_NOT_READY' }),
   });
   renderApp('/units/find-common-ground');
 
-  expect(await screen.findByText(/isn't built yet/i)).toBeInTheDocument();
-  expect(screen.getByRole('link', { name: /back to the training ground/i })).toBeInTheDocument();
+  // Not an error page: the server knows the unit, it just isn't written yet.
+  // Nothing on the way here said which unit it is, so the heading is general.
+  expect(
+    await screen.findByRole('heading', { level: 1, name: /this unit isn't built yet/i }),
+  ).toBeInTheDocument();
+  expect(screen.getByText('COMING SOON')).toBeInTheDocument();
+  expect(screen.getByRole('link', { name: /join the waitlist/i })).toHaveAttribute('href', FORM_URL);
+  expect(screen.queryByRole('link', { name: /back to the training ground/i })).not.toBeInTheDocument();
+  expect(document.title).toBe('Coming soon | Onion Loop');
+  // Asked once, not again on every render.
   await waitFor(() => expect(requestsTo('/practices')).toHaveLength(1));
 });
 
@@ -955,7 +982,7 @@ test('each turn asks for its own move, not the same one three times', async () =
   expect(screen.queryByText(COACHING.instruction)).not.toBeInTheDocument();
 });
 
-test('a retry keeps what landed and asks for what is still open', async () => {
+test('a retry says try again and lists every check still open', async () => {
   mockBackend({ '/practices/p1/reflections': RETRY_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
@@ -963,13 +990,14 @@ test('a retry keeps what landed and asks for what is still open', async () => {
   await replyWith('Hi.');
   userEvent.click(await screen.findByRole('button', { name: /try that again/i }));
 
-  expect(await screen.findByText(/2 of the three is still open/i)).toBeInTheDocument();
+  expect(await screen.findByText('Try again')).toBeInTheDocument();
   expect(screen.getByText(/attempt 2 of 3/i)).toBeInTheDocument();
 
-  // The two that are open are named; the one that landed is not repeated back.
+  // Nothing landed, so all three are open, named by their labels.
   const chips = document.querySelectorAll('.guide-chip.open');
-  expect(chips).toHaveLength(2);
-  expect(chips[0]).toHaveTextContent('Your name');
+  expect(chips).toHaveLength(3);
+  expect(chips[0]).toHaveTextContent('A greeting');
+  expect(chips[1]).toHaveTextContent('Your name');
 
   // A retry does not wait again: the instruction is out, with no countdown.
   expect(tipCard()).toHaveTextContent(COACHING.instruction);
@@ -995,7 +1023,7 @@ test('the retry guidance points at the missing move without giving the answer', 
   const composerPanel = document.querySelector('.step-page')!;
   expect(composerPanel).not.toHaveTextContent('Introduce yourself by name.');
   expect(composerPanel).not.toHaveTextContent('Ask Tom how his day is going.');
-  expect(composerPanel).not.toHaveTextContent('you opened with hello');
+  expect(composerPanel).not.toHaveTextContent('Open with a hello.');
 });
 
 test('moving to the next turn clears the retry guidance', async () => {
@@ -1417,4 +1445,118 @@ test('the footer has no Course column, and Home leads back to the units', async 
   expect(await tile()).toBeInTheDocument();
   // The About page gave the tab back when it left.
   expect(document.title).not.toMatch(/about/i);
+});
+
+// ---------------------------------------------------------------------------
+// The waitlist
+// ---------------------------------------------------------------------------
+
+const waitlistLink = () => screen.getByRole('link', { name: /join the waitlist/i });
+
+/** The form is another site, so it opens beside this one rather than over it. */
+function expectOpensTheForm(link: HTMLElement) {
+  expect(link).toHaveAttribute('href', FORM_URL);
+  expect(link).toHaveAttribute('target', '_blank');
+  expect(link.getAttribute('rel')).toMatch(/noopener/);
+  // Said aloud, since a new tab is otherwise a surprise.
+  expect(link).toHaveTextContent(/opens a google form in a new tab/i);
+}
+
+test('the home page offers the waitlist, and says what joining gets you', async () => {
+  mockBackend();
+  renderApp();
+
+  // One, in the hero.
+  expectOpensTheForm(waitlistLink());
+  expect(screen.getByText(WAITLIST_OFFER)).toBeInTheDocument();
+  expect(WAITLIST_OFFER).toMatch(/90 days/);
+});
+
+const header = () => within(screen.getByRole('banner'));
+
+test('the header has no waitlist button', async () => {
+  mockBackend();
+  renderApp();
+
+  expect(header().queryByRole('link', { name: /join the waitlist/i })).not.toBeInTheDocument();
+});
+
+test('the recap offers the waitlist under the next unit, not instead of it', async () => {
+  await reachTheRecap();
+
+  const next = screen.getByRole('button', { name: /next unit/i });
+  const join = waitlistLink();
+  expectOpensTheForm(join);
+  expect(next.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  // The main way on keeps the main button; the waitlist is the quiet one.
+  expect(next).toHaveClass('primary-button');
+  expect(join).not.toHaveClass('primary-button');
+});
+
+test('after the last playable unit the waitlist is still offered', async () => {
+  await reachTheRecap({ ...RECAP, nextUnit: null });
+
+  expectOpensTheForm(waitlistLink());
+});
+
+test('with no form to link to, there is no waitlist button and no offer', () => {
+  render(<WaitlistCta variant="hero" href="" />);
+
+  expect(screen.queryByRole('link')).not.toBeInTheDocument();
+  expect(screen.queryByText(WAITLIST_OFFER)).not.toBeInTheDocument();
+});
+
+// ---------------------------------------------------------------------------
+// Units not built yet
+// ---------------------------------------------------------------------------
+
+test('a Preview tile opens its coming-soon page, named, without asking the server', async () => {
+  mockBackend();
+  renderApp();
+  await tile();
+
+  userEvent.click(screen.getByRole('link', { name: /then go deep/i }));
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Then go deep' })).toBeInTheDocument();
+  expect(screen.getByText('COMING SOON')).toBeInTheDocument();
+  expect(screen.getByText('Then go deep — one day.')).toBeInTheDocument();
+  expect(screen.getByText(/about 5 min/i)).toBeInTheDocument();
+  // Joining is the main thing to do here, so it wears the main button.
+  const join = screen.getByRole('link', { name: /join the waitlist/i });
+  expectOpensTheForm(join);
+  expect(join).toHaveClass('primary-button');
+  expect(screen.getByText(WAITLIST_OFFER)).toBeInTheDocument();
+  expect(document.title).toBe('Then go deep (coming soon) | Onion Loop');
+  // The tile already said it is not built: nothing to ask.
+  expect(requestsTo('/practices')).toHaveLength(0);
+  // And no "Setting up your practice…" on the way.
+  expect(screen.queryByText(/setting up your practice/i)).not.toBeInTheDocument();
+});
+
+test('the coming-soon page leads back to all units', async () => {
+  mockBackend();
+  renderApp();
+  await tile();
+  userEvent.click(screen.getByRole('link', { name: /then go deep/i }));
+  await screen.findByText('COMING SOON');
+
+  userEvent.click(
+    within(screen.getByRole('navigation', { name: 'Coming soon' })).getByRole('link', {
+      name: /all units/i,
+    }),
+  );
+
+  expect(await tile()).toBeInTheDocument();
+  expect(screen.queryByText('COMING SOON')).not.toBeInTheDocument();
+});
+
+test('a unit that does not exist is not "coming soon"', async () => {
+  mockBackend({
+    '/practices': refusing(404, { error: "We couldn't find that unit.", code: 'UNKNOWN_UNIT' }),
+  });
+  renderApp('/units/nonsense');
+
+  expect(await screen.findByText(/couldn't find that unit/i)).toBeInTheDocument();
+  expect(screen.queryByText('COMING SOON')).not.toBeInTheDocument();
+  expect(screen.queryByRole('link', { name: /join the waitlist/i })).not.toBeInTheDocument();
 });

@@ -1,9 +1,11 @@
 import React, { useEffect, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useLocation, useParams } from 'react-router-dom';
 import ErrorNotice from '../components/ErrorNotice';
 import StepStrip from '../components/StepStrip';
 import { isPageLevel } from '../errors';
 import { Practising } from '../hooks/usePractice';
+import { UnitSummary } from '../types';
+import ComingSoonScreen from './ComingSoonScreen';
 
 /** Holds the layout while the first turn is on its way. */
 function PracticeSkeleton() {
@@ -31,9 +33,16 @@ function PracticeSkeleton() {
  * loaded, so a unit further down the curriculum is simply not in the browser,
  * and looking it up would call a real unit unknown. The server knows every
  * unit, and already says which of "no such unit" and "not built yet" applies.
+ *
+ * "Not built yet" is not an error page: it is the coming-soon page, with the
+ * waitlist. A Preview tile skips the question entirely by saying so up front.
  */
 export default function PracticeScreen({ practice }: { practice: Practising }) {
   const { unitId: routeUnitId } = useParams<{ unitId: string }>();
+  // A Preview tile says, on the way here, that this unit is not built. Then
+  // there is nothing to ask the server: the coming-soon page is the answer.
+  const handedOver = (useLocation().state as { preview?: UnitSummary } | null)?.preview;
+  const preview = handedOver && handedOver.id === routeUnitId ? handedOver : null;
   const {
     unitId,
     unitTitle,
@@ -52,14 +61,19 @@ export default function PracticeScreen({ practice }: { practice: Practising }) {
   const attempted = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!routeUnitId) return;
+    if (!routeUnitId || preview) return;
     if (unitId === routeUnitId && turn) return;
     if (attempted.current === routeUnitId) return;
     attempted.current = routeUnitId;
     void start(routeUnitId);
-  }, [routeUnitId, unitId, turn, start]);
+  }, [routeUnitId, preview, unitId, turn, start]);
+
+  if (preview) return <ComingSoonScreen unit={preview} />;
 
   const blocking = error && isPageLevel(error) ? error : null;
+  // Arrived by a link rather than a tile. The server knows the unit and says
+  // it is not written yet: that is "coming soon", not a failure.
+  if (blocking?.code === 'UNIT_NOT_READY') return <ComingSoonScreen />;
   if (blocking) {
     return (
       <ErrorNotice error={blocking} variant="page">
