@@ -439,44 +439,52 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 10px 12px;
+  gap: 10px 14px;
   margin-bottom: 20px;
 }
 
 .step-arrow {
-  width: 36px;
-  height: 36px;
-  border: 1px solid var(--border-color);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 2px solid var(--primary-color);
   border-radius: 50%;
   background: var(--white);
-  color: var(--text-dark);
-  font-weight: 700;
-  line-height: 1;
+  color: var(--primary-color);
+  cursor: pointer;
+  transition: background-color .2s ease, color .2s ease;
 }
 
-.step-arrow:hover:not(:disabled) { border-color: var(--primary-color); color: var(--primary-color); }
-.step-arrow:disabled { opacity: .35; cursor: default; }
+.step-arrow svg { width: 24px; height: 24px; }
+.step-arrow:hover:not(:disabled) { background: var(--primary-color); color: var(--on-primary); }
+.step-arrow:focus-visible { outline: 2px solid var(--primary-color); outline-offset: 3px; }
+.step-arrow:disabled { border-color: var(--border-color); color: var(--text-light); opacity: .5; cursor: default; }
 
-.step-dots { display: flex; align-items: center; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.step-dots { display: flex; align-items: center; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .step-dots li { display: flex; }
 
 .step-dot {
   display: block;
-  width: 10px;
-  height: 10px;
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: 0;
-  border-radius: 5px;
+  border-radius: 7px;
   background: var(--primary-color);
-  opacity: .4;
+  opacity: .45;
+  cursor: pointer;
   transition: width .25s ease, opacity .25s ease;
 }
 
-.step-dot.is-active { width: 26px; opacity: 1; }
-.step-dot.is-locked { border: 1px dashed var(--border-color); background: none; opacity: 1; }
+.step-dot.is-active { width: 36px; opacity: 1; }
+.step-dot.is-locked { border: 2px dashed var(--text-light); background: none; opacity: .6; cursor: default; }
 
-.step-count { color: var(--text-light); font-size: 13px; font-weight: 700; }
-.step-return { margin-left: auto; }
+.step-count { color: var(--text-dark); font-size: 15px; font-weight: 700; }
+.step-return { margin-left: auto; font-size: 14px; }
 
 .step-strip {
   display: flex;
@@ -1040,6 +1048,6 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
   .skeleton-line { animation: none; }
   /* Page changes jump rather than glide — see StepStrip.tsx. */
   .coach-surface, .tip-count { animation: none; }
-  .step-dot, .step-strip { transition: none; }
+  .step-dot, .step-arrow, .step-strip { transition: none; }
   .unit-tile, .primary-button, .theme-toggle, .back-to-units, .unit-cover img { transition: none; }
 }

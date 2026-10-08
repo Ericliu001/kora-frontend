@@ -21,6 +21,22 @@ const isTyping = (target: EventTarget | null) => {
   );
 };
 
+/** Drawn rather than typed: a ← glyph is thin and sits small in its circle. */
+function Chevron({ direction }: { direction: 'left' | 'right' }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        d={direction === 'left' ? 'M15 5l-7 7 7 7' : 'M9 5l7 7-7 7'}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.75"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 /**
  * The practice as a row of pages, one per turn, scrolled sideways.
  *
@@ -137,7 +153,7 @@ export default function StepStrip({ practice }: { practice: Practising }) {
           disabled={active <= 0}
           aria-label="Previous turn"
         >
-          ←
+          <Chevron direction="left" />
         </button>
         <ol className="step-dots">
           {Array.from({ length: Math.max(turnCount, steps.length) }, (_, index) => (
@@ -161,7 +177,7 @@ export default function StepStrip({ practice }: { practice: Practising }) {
           disabled={active >= last}
           aria-label="Next turn"
         >
-          →
+          <Chevron direction="right" />
         </button>
         <span className="step-count" aria-live="polite">
           Turn {active + 1} of {turnCount}
