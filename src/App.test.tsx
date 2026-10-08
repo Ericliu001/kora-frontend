@@ -51,6 +51,7 @@ const BUILT_UNIT = {
   playable: true,
   skill: 'Opening a conversation',
   estimatedMinutes: 4,
+  access: 'free' as const,
   turnCount: 3,
 };
 
@@ -68,6 +69,7 @@ const preview = (id: string, moduleId: string, title: string, skill: string) => 
   playable: false,
   skill,
   estimatedMinutes: 5,
+  access: 'member' as const,
 });
 
 const MODULES = [
@@ -483,6 +485,59 @@ const headersSentTo = (suffix: string) => {
   expect(call).toBeDefined();
   return new Headers((call![1] as RequestInit | undefined)?.headers);
 };
+
+const freeBadges = (container: HTMLElement) =>
+  Array.from(container.querySelectorAll('.unit-free-badge')).map(
+    (badge) => badge.closest('.unit-tile')?.querySelector('strong')?.textContent,
+  );
+
+test('a free unit says so on its cover; a members-only one does not', async () => {
+  mockBackend();
+  const { container } = renderApp();
+  await tile();
+
+  expect(freeBadges(container)).toEqual(['Start a conversation']);
+  expect(within(await tile()).getByText('Free')).toBeInTheDocument();
+  expect(
+    within(screen.getByRole('link', { name: /then go deep/i })).queryByText('Free'),
+  ).not.toBeInTheDocument();
+});
+
+test('free is what the server says, not where the unit sits or whether it is built', async () => {
+  // A free unit that is not built yet, and a built one that is for members.
+  const page = {
+    ...PAGE_1,
+    units: [
+      { ...BUILT_UNIT, access: 'member' as const },
+      { ...PAGE_1.units[1], access: 'free' as const },
+    ],
+  };
+  mockBackend({ '/units': page });
+  const { container } = renderApp();
+  await tile();
+
+  expect(freeBadges(container)).toEqual(['Then go deep']);
+});
+
+test('a server that does not say who may open a unit shows no badge', async () => {
+  const { access, ...older } = BUILT_UNIT;
+  mockBackend({ '/units': { ...PAGE_1, units: [older, ...PAGE_1.units.slice(1)] } });
+  const { container } = renderApp();
+  await tile();
+
+  expect(access).toBe('free');
+  expect(container.querySelectorAll('.unit-free-badge')).toHaveLength(0);
+});
+
+test('a screen reader hears the unit before it hears that it is free', async () => {
+  mockBackend();
+  renderApp();
+
+  // The cover is hidden from screen readers, so the badge must not be inside it.
+  expect(await tile()).toHaveAccessibleName(
+    expect.stringMatching(/start a conversation.*\bfree\b/i),
+  );
+});
 
 test('a request with no body is not labelled JSON, so the browser sends no preflight', async () => {
   mockBackend();

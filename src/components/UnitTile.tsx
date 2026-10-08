@@ -70,6 +70,16 @@ export default function UnitTile({
     </span>
   );
 
+  /**
+   * "Free" sits over the cover but is not inside it: the cover is aria-hidden,
+   * and a screen reader should hear it too. It comes after the title in the
+   * DOM, so the tile is announced by name first ("Unit 1, Start a
+   * conversation, Free"), and the stylesheet lifts it onto the picture.
+   *
+   * Whether a unit is free is the server's call, per unit, not a count kept
+   * here: it has nothing to do with position, or with whether the unit is
+   * built yet.
+   */
   const body = (
     <>
       <UnitCover index={index} coverUrl={unit.coverUrl} coverUrl2x={unit.coverUrl2x} />
@@ -80,6 +90,12 @@ export default function UnitTile({
         </span>
         <strong>{unit.title}</strong>
       </span>
+      {unit.access === 'free' && (
+        <>
+          {' '}
+          <span className="unit-free-badge">Free</span>
+        </>
+      )}
     </>
   );
 

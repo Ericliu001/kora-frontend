@@ -49,6 +49,12 @@ export interface UnitSummary {
   playable: boolean;
   skill: string;
   estimatedMinutes: number;
+  /**
+   * Who may open the unit: anyone, or registered members only. The server
+   * decides (units.csv's `access` column); the tile only shows it. Absent from
+   * an older server, which reads as not free.
+   */
+  access?: 'free' | 'member';
   turnCount?: number | null;
   /**
    * The unit still, resized for a tile, once the unit is filmed. Without one
