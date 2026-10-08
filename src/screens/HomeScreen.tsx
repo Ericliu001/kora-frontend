@@ -76,7 +76,7 @@ export default function HomeScreen({
     <>
       <section className="hero bg-pattern-onion-hero">
         <div className="hero-content">
-          <h1>Conversation practice with feedback</h1>
+          <h1>Chat practice</h1>
           <p>
             Improve your social skills by practising conversation and small talk. Watch a short
             video of someone talking to you, reply by speaking or typing, and see what you did
