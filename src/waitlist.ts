@@ -9,4 +9,4 @@
 export const WAITLIST_FORM_URL = 'https://forms.gle/MnqtRdLy1xc7uR7m8';
 
 /** What joining gets you. Shown under the button wherever it appears. */
-export const WAITLIST_OFFER = "Get the full course free for 90 days when it's ready.";
+export const WAITLIST_OFFER = "Get the full course free for 30 days when it's ready.";

@@ -1524,7 +1524,7 @@ test('the home page offers the waitlist, and says what joining gets you', async 
   // One, in the hero.
   expectOpensTheForm(waitlistLink());
   expect(screen.getByText(WAITLIST_OFFER)).toBeInTheDocument();
-  expect(WAITLIST_OFFER).toMatch(/90 days/);
+  expect(WAITLIST_OFFER).toMatch(/30 days/);
 });
 
 const header = () => within(screen.getByRole('banner'));
