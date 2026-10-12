@@ -780,10 +780,10 @@ test('an authored example is never passed off as a rewrite of what you said', as
 });
 
 /**
- * A rewrite of a reply that was already right says it fell short when nothing
- * was missing. The strongest version of a strong reply is the one they wrote.
+ * A reply that landed all three has nothing missing, so there is nothing
+ * stronger to show — not a rewrite, not the example, not its own words back.
  */
-test('a reply that lands all three is shown its own words, not a better version', async () => {
+test('a reply that lands all three gets no stronger reply', async () => {
   mockBackend({ '/practices/p1/reflections': BEST_REFLECTION });
   renderApp();
   await reachThePracticeRoom();
@@ -791,11 +791,14 @@ test('a reply that lands all three is shown its own words, not a better version'
   await replyWith('Hi Tom, I am Alex. How has your day been?');
   await screen.findByText(BEST_REFLECTION.feedback);
 
-  expect(screen.getByText(/this is the move/i)).toBeInTheDocument();
-  expect(screen.getByText('“Hi Tom, I am Alex. How has your day been?”')).toBeInTheDocument();
+  expect(screen.queryByText(/this is the move/i)).not.toBeInTheDocument();
   expect(screen.queryByText(/a stronger version of your reply/i)).not.toBeInTheDocument();
+  expect(screen.queryByText(/one way to say it/i)).not.toBeInTheDocument();
   expect(
     screen.queryByText(`“${REFLECTION.strongerReply.text}”`),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByText('“Hi Tom, I am Alex. How has your day been?”'),
   ).not.toBeInTheDocument();
 });
 
@@ -1295,6 +1298,27 @@ test('after the last playable unit the recap offers no next unit', async () => {
 
   expect(screen.queryByRole('button', { name: /next unit/i })).not.toBeInTheDocument();
   expect(backFromRecap()).toBeInTheDocument();
+});
+
+test('a recap where every turn landed all three shows no strongest version', async () => {
+  await reachTheRecap({
+    ...RECAP,
+    levels: ['BEST'],
+    turns: [{ ...RECAP.turns[0], level: 'BEST', met: 3 }],
+    focus: null,
+    summary: 'You did all three parts of every move, across one turn. That\'s the whole skill.',
+    suggestedLine: null,
+  });
+
+  expect(screen.getByText(/that's the whole skill/i)).toBeInTheDocument();
+  expect(screen.queryByText(/your strongest version/i)).not.toBeInTheDocument();
+});
+
+test('a recap with a turn to work on keeps its strongest version', async () => {
+  await reachTheRecap();
+
+  expect(screen.getByText(/your strongest version/i)).toBeInTheDocument();
+  expect(screen.getByText(`“${RECAP.suggestedLine}”`)).toBeInTheDocument();
 });
 
 test('a server that does not say what is next still gets a recap', async () => {

@@ -71,11 +71,14 @@ export default function RecapScreen({
         ))}
       </ul>
 
-      {/* Their own reply, strengthened — which is why it is worth keeping. */}
-      <div className="stronger-reply">
-        <p className="card-kicker">YOUR STRONGEST VERSION</p>
-        <blockquote>“{recap.suggestedLine}”</blockquote>
-      </div>
+      {/* Their own reply, strengthened — which is why it is worth keeping. When
+          every turn landed all three checks there is nothing stronger to offer. */}
+      {recap.suggestedLine && (
+        <div className="stronger-reply">
+          <p className="card-kicker">YOUR STRONGEST VERSION</p>
+          <blockquote>“{recap.suggestedLine}”</blockquote>
+        </div>
+      )}
 
       {next && (
         <button

@@ -744,10 +744,6 @@ button.unit-tile:hover:not(:disabled) .unit-cover img { transform: scale(1.03); 
 
 .stronger-reply blockquote { margin: 8px 0 0; font-size: 1.25rem; line-height: 1.4; }
 
-/* Nothing was missing, so the model answer is the learner's own sentence. The
- * rail turns the colour of a check that landed to say so without a word. */
-.stronger-reply.is-your-words { border-left-color: var(--success); }
-
 .pending-note { margin: 4px 0 0; color: var(--text-light); font-size: 14px; font-style: italic; }
 .composer-hint { margin: 10px 0 0; color: var(--text-light); font-size: 13px; }
 

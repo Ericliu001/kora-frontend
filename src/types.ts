@@ -177,7 +177,8 @@ export interface Recap {
   strongest?: string;
   focus?: string;
   summary: string;
-  suggestedLine: string;
+  /** Absent or null when every turn landed all three checks: nothing stronger to suggest. */
+  suggestedLine?: string | null;
   /** Absent after the last playable unit, and on a server older than the field. */
   nextUnit?: NextUnit | null;
 }
